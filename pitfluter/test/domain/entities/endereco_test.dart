@@ -4,7 +4,7 @@ import 'package:pitfluter/domain/entities/endereco.dart';
 void main() {
   group('Endereco', () {
     test('deve criar uma instância válida de Endereco', () {
-      final endereco = Endereco(
+      const endereco = Endereco(
         id: 1,
         clienteId: 1,
         apelido: 'Casa',
@@ -38,7 +38,7 @@ void main() {
     });
 
     test('deve aceitar valores nulos para campos opcionais', () {
-      final endereco = Endereco(
+      const endereco = Endereco(
         id: 1,
         clienteId: 1,
         apelido: 'Trabalho',
@@ -60,7 +60,7 @@ void main() {
     });
 
     test('deve implementar Equatable corretamente', () {
-      final endereco1 = Endereco(
+      const endereco1 = Endereco(
         id: 1,
         clienteId: 1,
         apelido: 'Casa',
@@ -77,7 +77,7 @@ void main() {
         padrao: false,
       );
 
-      final endereco2 = Endereco(
+      const endereco2 = Endereco(
         id: 1,
         clienteId: 1,
         apelido: 'Casa',
@@ -98,7 +98,7 @@ void main() {
     });
 
     test('deve ter copyWith funcionando corretamente', () {
-      final endereco = Endereco(
+      const endereco = Endereco(
         id: 1,
         clienteId: 1,
         apelido: 'Casa',
@@ -129,7 +129,7 @@ void main() {
     });
 
     test('deve calcular endereço completo corretamente', () {
-      final endereco = Endereco(
+      const endereco = Endereco(
         id: 1,
         clienteId: 1,
         apelido: 'Casa',
@@ -151,7 +151,7 @@ void main() {
     });
 
     test('deve calcular endereço completo sem complemento', () {
-      final endereco = Endereco(
+      const endereco = Endereco(
         id: 1,
         clienteId: 1,
         apelido: 'Casa',

@@ -4,7 +4,7 @@ import 'package:pitfluter/domain/entities/item_pedido.dart';
 void main() {
   group('ItemPedido', () {
     test('deve criar uma instância válida de ItemPedido', () {
-      final item = ItemPedido(
+      const item = ItemPedido(
         id: 1,
         pedidoId: 1,
         produtoId: 1,
@@ -32,7 +32,7 @@ void main() {
     });
 
     test('deve criar item meio a meio', () {
-      final item = ItemPedido(
+      const item = ItemPedido(
         id: 2,
         pedidoId: 1,
         produtoId: 1,
@@ -52,7 +52,7 @@ void main() {
     });
 
     test('deve aceitar valores nulos para campos opcionais', () {
-      final item = ItemPedido(
+      const item = ItemPedido(
         id: 3,
         pedidoId: 1,
         produtoId: 3,
@@ -72,7 +72,7 @@ void main() {
     });
 
     test('deve implementar Equatable corretamente', () {
-      final item1 = ItemPedido(
+      const item1 = ItemPedido(
         id: 1,
         pedidoId: 1,
         produtoId: 1,
@@ -86,7 +86,7 @@ void main() {
         tamanhoMeioId: null,
       );
 
-      final item2 = ItemPedido(
+      const item2 = ItemPedido(
         id: 1,
         pedidoId: 1,
         produtoId: 1,
@@ -104,7 +104,7 @@ void main() {
     });
 
     test('deve ter copyWith funcionando corretamente', () {
-      final item = ItemPedido(
+      const item = ItemPedido(
         id: 1,
         pedidoId: 1,
         produtoId: 1,
@@ -132,7 +132,7 @@ void main() {
     });
 
     test('deve calcular valor total corretamente', () {
-      final item = ItemPedido(
+      const item = ItemPedido(
         id: 1,
         pedidoId: 1,
         produtoId: 1,
@@ -151,7 +151,7 @@ void main() {
     });
 
     test('deve validar se é meio a meio corretamente', () {
-      final itemMeioAMeio = ItemPedido(
+      const itemMeioAMeio = ItemPedido(
         id: 1,
         pedidoId: 1,
         produtoId: 1,
@@ -165,7 +165,7 @@ void main() {
         tamanhoMeioId: 1,
       );
 
-      final itemNormal = ItemPedido(
+      const itemNormal = ItemPedido(
         id: 2,
         pedidoId: 1,
         produtoId: 1,
@@ -184,7 +184,7 @@ void main() {
     });
 
     test('deve invalidar meio a meio sem dados necessários', () {
-      final itemInvalido = ItemPedido(
+      const itemInvalido = ItemPedido(
         id: 1,
         pedidoId: 1,
         produtoId: 1,

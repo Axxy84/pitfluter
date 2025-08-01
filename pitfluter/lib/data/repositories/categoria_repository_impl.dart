@@ -24,16 +24,16 @@ class CategoriaRepositoryImpl implements CategoriaRepository {
         final categorias = await remoteDataSource.getCategorias();
         return Right(categorias);
       } on ServerException catch (e) {
-        return Left(ServerFailure(message: e.message));
+        return Left(ServerFailure(e.message));
       } on NotFoundException catch (e) {
-        return Left(NotFoundFailure(message: e.message));
+        return Left(NotFoundFailure(e.message));
       } on SocketException {
-        return Left(NetworkFailure(message: 'Sem conexão com a internet'));
+        return const Left(NetworkFailure('Sem conexão com a internet'));
       } catch (e) {
-        return Left(ServerFailure(message: 'Erro inesperado: ${e.toString()}'));
+        return Left(ServerFailure('Erro inesperado: ${e.toString()}'));
       }
     } else {
-      return Left(NetworkFailure(message: 'Sem conexão com a internet'));
+      return const Left(NetworkFailure('Sem conexão com a internet'));
     }
   }
 
@@ -44,16 +44,16 @@ class CategoriaRepositoryImpl implements CategoriaRepository {
         final categoria = await remoteDataSource.getCategoriaById(id);
         return Right(categoria);
       } on ServerException catch (e) {
-        return Left(ServerFailure(message: e.message));
+        return Left(ServerFailure(e.message));
       } on NotFoundException catch (e) {
-        return Left(NotFoundFailure(message: e.message));
+        return Left(NotFoundFailure(e.message));
       } on SocketException {
-        return Left(NetworkFailure(message: 'Sem conexão com a internet'));
+        return const Left(NetworkFailure('Sem conexão com a internet'));
       } catch (e) {
-        return Left(ServerFailure(message: 'Erro inesperado: ${e.toString()}'));
+        return Left(ServerFailure('Erro inesperado: ${e.toString()}'));
       }
     } else {
-      return Left(NetworkFailure(message: 'Sem conexão com a internet'));
+      return const Left(NetworkFailure('Sem conexão com a internet'));
     }
   }
 
@@ -65,14 +65,14 @@ class CategoriaRepositoryImpl implements CategoriaRepository {
         final createdCategoria = await remoteDataSource.createCategoria(categoriaModel);
         return Right(createdCategoria);
       } on ServerException catch (e) {
-        return Left(ServerFailure(message: e.message));
+        return Left(ServerFailure(e.message));
       } on SocketException {
-        return Left(NetworkFailure(message: 'Sem conexão com a internet'));
+        return const Left(NetworkFailure('Sem conexão com a internet'));
       } catch (e) {
-        return Left(ServerFailure(message: 'Erro inesperado: ${e.toString()}'));
+        return Left(ServerFailure('Erro inesperado: ${e.toString()}'));
       }
     } else {
-      return Left(NetworkFailure(message: 'Sem conexão com a internet'));
+      return const Left(NetworkFailure('Sem conexão com a internet'));
     }
   }
 
@@ -84,16 +84,16 @@ class CategoriaRepositoryImpl implements CategoriaRepository {
         final updatedCategoria = await remoteDataSource.updateCategoria(categoriaModel);
         return Right(updatedCategoria);
       } on ServerException catch (e) {
-        return Left(ServerFailure(message: e.message));
+        return Left(ServerFailure(e.message));
       } on NotFoundException catch (e) {
-        return Left(NotFoundFailure(message: e.message));
+        return Left(NotFoundFailure(e.message));
       } on SocketException {
-        return Left(NetworkFailure(message: 'Sem conexão com a internet'));
+        return const Left(NetworkFailure('Sem conexão com a internet'));
       } catch (e) {
-        return Left(ServerFailure(message: 'Erro inesperado: ${e.toString()}'));
+        return Left(ServerFailure('Erro inesperado: ${e.toString()}'));
       }
     } else {
-      return Left(NetworkFailure(message: 'Sem conexão com a internet'));
+      return const Left(NetworkFailure('Sem conexão com a internet'));
     }
   }
 
@@ -104,16 +104,16 @@ class CategoriaRepositoryImpl implements CategoriaRepository {
         await remoteDataSource.deleteCategoria(id);
         return const Right(null);
       } on ServerException catch (e) {
-        return Left(ServerFailure(message: e.message));
+        return Left(ServerFailure(e.message));
       } on NotFoundException catch (e) {
-        return Left(NotFoundFailure(message: e.message));
+        return Left(NotFoundFailure(e.message));
       } on SocketException {
-        return Left(NetworkFailure(message: 'Sem conexão com a internet'));
+        return const Left(NetworkFailure('Sem conexão com a internet'));
       } catch (e) {
-        return Left(ServerFailure(message: 'Erro inesperado: ${e.toString()}'));
+        return Left(ServerFailure('Erro inesperado: ${e.toString()}'));
       }
     } else {
-      return Left(NetworkFailure(message: 'Sem conexão com a internet'));
+      return const Left(NetworkFailure('Sem conexão com a internet'));
     }
   }
 

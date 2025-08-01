@@ -29,9 +29,9 @@ class CategoriaRemoteDataSourceImpl implements CategoriaRemoteDataSource {
           .map<CategoriaModel>((json) => CategoriaModel.fromJson(json))
           .toList();
     } on PostgrestException catch (e) {
-      throw ServerException(message: e.message);
+      throw ServerException(e.message);
     } catch (e) {
-      throw ServerException(message: e.toString());
+      throw ServerException(e.toString());
     }
   }
 
@@ -47,11 +47,11 @@ class CategoriaRemoteDataSourceImpl implements CategoriaRemoteDataSource {
       return CategoriaModel.fromJson(response);
     } on PostgrestException catch (e) {
       if (e.code == 'PGRST116') {
-        throw NotFoundException(message: 'Categoria não encontrada');
+        throw const NotFoundException('Categoria não encontrada');
       }
-      throw ServerException(message: e.message);
+      throw ServerException(e.message);
     } catch (e) {
-      throw ServerException(message: e.toString());
+      throw ServerException(e.toString());
     }
   }
 
@@ -66,9 +66,9 @@ class CategoriaRemoteDataSourceImpl implements CategoriaRemoteDataSource {
 
       return CategoriaModel.fromJson(response);
     } on PostgrestException catch (e) {
-      throw ServerException(message: e.message);
+      throw ServerException(e.message);
     } catch (e) {
-      throw ServerException(message: e.toString());
+      throw ServerException(e.toString());
     }
   }
 
@@ -84,9 +84,9 @@ class CategoriaRemoteDataSourceImpl implements CategoriaRemoteDataSource {
 
       return CategoriaModel.fromJson(response);
     } on PostgrestException catch (e) {
-      throw ServerException(message: e.message);
+      throw ServerException(e.message);
     } catch (e) {
-      throw ServerException(message: e.toString());
+      throw ServerException(e.toString());
     }
   }
 
@@ -98,9 +98,9 @@ class CategoriaRemoteDataSourceImpl implements CategoriaRemoteDataSource {
           .delete()
           .eq('id', id);
     } on PostgrestException catch (e) {
-      throw ServerException(message: e.message);
+      throw ServerException(e.message);
     } catch (e) {
-      throw ServerException(message: e.toString());
+      throw ServerException(e.toString());
     }
   }
 

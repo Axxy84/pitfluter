@@ -6,7 +6,7 @@ import 'package:pitfluter/presentation/widgets/cliente_search_field.dart';
 void main() {
   group('ClienteSearchField Widget Tests', () {
     final mockClientes = [
-      const Cliente(
+      Cliente(
         id: 1,
         nome: 'João Silva',
         telefone: '(11) 99999-9999',
@@ -15,7 +15,7 @@ void main() {
         dataCadastro: DateTime.parse('2024-01-01T10:00:00Z'),
         ultimaAtualizacao: DateTime.parse('2024-01-01T10:00:00Z'),
       ),
-      const Cliente(
+      Cliente(
         id: 2,
         nome: 'Maria Santos',
         telefone: '(11) 88888-8888',

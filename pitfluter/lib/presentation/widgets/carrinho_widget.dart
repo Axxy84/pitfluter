@@ -81,7 +81,7 @@ class CarrinhoWidget extends StatelessWidget {
               ? null
               : [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
+                    color: Colors.grey.withValues(alpha: 0.2),
                     blurRadius: 8,
                     offset: const Offset(-2, 0),
                   ),
@@ -108,9 +108,9 @@ class CarrinhoWidget extends StatelessWidget {
                     color: Colors.white,
                   ),
                   const SizedBox(width: 8),
-                  Text(
+                  const Text(
                     'Carrinho',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

@@ -1,0 +1,1 @@
+export 'novo_pedido_modal.dart';

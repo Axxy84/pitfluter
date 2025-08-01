@@ -1,23 +1,31 @@
-class ServerException implements Exception {
+abstract class AppException implements Exception {
   final String message;
+  const AppException(this.message);
   
-  ServerException(this.message);
+  @override
+  String toString() => message;
 }
 
-class CacheException implements Exception {
-  final String message;
-  
-  CacheException(this.message);
+class ServerException extends AppException {
+  const ServerException(super.message);
 }
 
-class NetworkException implements Exception {
-  final String message;
-  
-  NetworkException(this.message);
+class NetworkException extends AppException {
+  const NetworkException(super.message);
 }
 
-class AuthenticationException implements Exception {
-  final String message;
-  
-  AuthenticationException(this.message);
+class CacheException extends AppException {
+  const CacheException(super.message);
+}
+
+class NotFoundException extends AppException {
+  const NotFoundException(super.message);
+}
+
+class InvalidTypeException extends ServerException {
+  const InvalidTypeException(super.message);
+}
+
+class AuthenticationException extends AppException {
+  const AuthenticationException(super.message);
 }

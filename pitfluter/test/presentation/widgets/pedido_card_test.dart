@@ -8,7 +8,7 @@ void main() {
     late Pedido mockPedido;
 
     setUp(() {
-      mockPedido = const Pedido(
+      mockPedido = Pedido(
         id: 1,
         numero: 'PED001',
         clienteId: 1,

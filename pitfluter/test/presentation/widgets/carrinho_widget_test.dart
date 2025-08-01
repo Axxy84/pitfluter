@@ -6,7 +6,7 @@ import 'package:pitfluter/presentation/widgets/carrinho_widget.dart';
 
 void main() {
   group('CarrinhoWidget Widget Tests', () {
-    final mockProduto = const Produto(
+    const mockProduto = Produto(
       id: 1,
       nome: 'Pizza Margherita',
       categoriaId: 1,
@@ -17,7 +17,7 @@ void main() {
       ultimaAtualizacao: '2024-01-01T10:00:00Z',
     );
 
-    final mockTamanho = const Tamanho(
+    const mockTamanho = Tamanho(
       id: 1,
       nome: 'Média',
       fatorMultiplicador: 1.0,

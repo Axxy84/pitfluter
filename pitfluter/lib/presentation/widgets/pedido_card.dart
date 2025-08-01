@@ -20,7 +20,7 @@ class PedidoCard extends StatelessWidget {
     final typeIcon = _getTypeIcon(pedido.tipo);
     
     return Card(
-      color: statusColor.withOpacity(0.1),
+      color: statusColor.withValues(alpha: 0.1),
       elevation: 2,
       child: InkWell(
         onTap: onTap,

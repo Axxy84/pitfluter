@@ -38,15 +38,15 @@ class MainLayout extends StatelessWidget {
                   // App Header
                   Container(
                     padding: const EdgeInsets.all(24),
-                    child: Row(
+                    child: const Row(
                       children: [
                         Icon(
                           Icons.local_pizza,
                           color: Colors.white,
                           size: 32,
                         ),
-                        const SizedBox(width: 12),
-                        const Text(
+                        SizedBox(width: 12),
+                        Text(
                           'PitFlutter',
                           style: TextStyle(
                             color: Colors.white,
@@ -203,7 +203,7 @@ class MainLayout extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        color: isSelected ? primaryRed.withOpacity(0.2) : null,
+        color: isSelected ? primaryRed.withValues(alpha: 0.2) : null,
       ),
       child: ListTile(
         leading: Icon(

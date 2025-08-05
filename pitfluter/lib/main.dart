@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'presentation/screens/dashboard_screen.dart';
 import 'presentation/screens/pedidos_screen.dart';
-import 'presentation/modals/novo_pedido_modal.dart';
+import 'presentation/screens/produtos_screen.dart';
+import 'presentation/screens/novo_pedido_screen.dart';
+import 'core/constants/supabase_constants.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,11 +28,11 @@ void main() async {
     await windowManager.focus();
   });
 
-  // Initialize Supabase (opcional para demo)
-  // await Supabase.initialize(
-  //   url: SupabaseConstants.supabaseUrl,
-  //   anonKey: SupabaseConstants.supabaseAnonKey,
-  // );
+  // Initialize Supabase
+  await Supabase.initialize(
+    url: SupabaseConstants.supabaseUrl,
+    anonKey: SupabaseConstants.supabaseAnonKey,
+  );
 
   runApp(
     const ProviderScope(
@@ -59,11 +62,12 @@ class MyApp extends StatelessWidget {
       routes: {
         '/': (context) => const DashboardScreen(),
         '/pedidos': (context) => const PedidosScreen(),
+        '/produtos': (context) => const ProdutosScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/novo-pedido') {
           return MaterialPageRoute(
-            builder: (context) => const NovoPedidoModal(),
+            builder: (context) => const NovoPedidoScreen(),
             fullscreenDialog: true,
           );
         }

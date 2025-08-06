@@ -661,6 +661,14 @@ class _DashboardScreenState extends State<DashboardScreen>
             },
           ),
           ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('Histórico de Caixas'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/historico-caixas');
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.people),
             title: const Text('Clientes'),
             onTap: () {

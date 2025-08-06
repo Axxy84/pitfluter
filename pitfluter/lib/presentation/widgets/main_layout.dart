@@ -101,6 +101,12 @@ class MainLayout extends StatelessWidget {
                         ),
                         _buildNavigationItem(
                           context,
+                          icon: Icons.history,
+                          title: 'Histórico de Caixas',
+                          route: '/historico-caixas',
+                        ),
+                        _buildNavigationItem(
+                          context,
                           icon: Icons.attach_money,
                           title: 'Financeiro',
                           route: '/financeiro',

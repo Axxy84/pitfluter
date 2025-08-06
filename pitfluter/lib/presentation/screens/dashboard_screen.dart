@@ -653,6 +653,14 @@ class _DashboardScreenState extends State<DashboardScreen>
             },
           ),
           ListTile(
+            leading: const Icon(Icons.account_balance_wallet),
+            title: const Text('Caixa'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/caixa');
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.people),
             title: const Text('Clientes'),
             onTap: () {

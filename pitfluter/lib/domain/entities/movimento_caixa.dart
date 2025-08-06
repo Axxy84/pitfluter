@@ -1,19 +1,28 @@
 import 'package:equatable/equatable.dart';
 
-enum TipoMovimentoCaixa {
-  entrada,
-  saida,
+enum TipoMovimento {
+  venda,
   sangria,
+  suprimento,
+  abertura,
+  fechamento,
+}
+
+enum FormaPagamento {
+  dinheiro,
+  cartao,
+  pix,
 }
 
 class MovimentoCaixa extends Equatable {
   final int id;
   final int caixaId;
-  final TipoMovimentoCaixa tipo;
+  final TipoMovimento tipo;
   final double valor;
   final String descricao;
+  final FormaPagamento formaPagamento;
+  final DateTime dataHora;
   final String? observacoes;
-  final DateTime dataMovimento;
   final String dataCadastro;
 
   const MovimentoCaixa({
@@ -22,23 +31,25 @@ class MovimentoCaixa extends Equatable {
     required this.tipo,
     required this.valor,
     required this.descricao,
+    required this.formaPagamento,
+    required this.dataHora,
     this.observacoes,
-    required this.dataMovimento,
     required this.dataCadastro,
   });
 
-  bool get isEntrada => tipo == TipoMovimentoCaixa.entrada;
-  bool get isSaida => tipo == TipoMovimentoCaixa.saida;
-  bool get isSangria => tipo == TipoMovimentoCaixa.sangria;
+  bool get isEntrada => tipo == TipoMovimento.venda || tipo == TipoMovimento.suprimento;
+  bool get isSaida => tipo == TipoMovimento.sangria;
+  bool get isSangria => tipo == TipoMovimento.sangria;
 
   MovimentoCaixa copyWith({
     int? id,
     int? caixaId,
-    TipoMovimentoCaixa? tipo,
+    TipoMovimento? tipo,
     double? valor,
     String? descricao,
+    FormaPagamento? formaPagamento,
+    DateTime? dataHora,
     String? observacoes,
-    DateTime? dataMovimento,
     String? dataCadastro,
   }) {
     return MovimentoCaixa(
@@ -47,8 +58,9 @@ class MovimentoCaixa extends Equatable {
       tipo: tipo ?? this.tipo,
       valor: valor ?? this.valor,
       descricao: descricao ?? this.descricao,
+      formaPagamento: formaPagamento ?? this.formaPagamento,
+      dataHora: dataHora ?? this.dataHora,
       observacoes: observacoes ?? this.observacoes,
-      dataMovimento: dataMovimento ?? this.dataMovimento,
       dataCadastro: dataCadastro ?? this.dataCadastro,
     );
   }
@@ -60,8 +72,9 @@ class MovimentoCaixa extends Equatable {
         tipo,
         valor,
         descricao,
+        formaPagamento,
+        dataHora,
         observacoes,
-        dataMovimento,
         dataCadastro,
       ];
 }

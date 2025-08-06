@@ -95,6 +95,12 @@ class MainLayout extends StatelessWidget {
                         ),
                         _buildNavigationItem(
                           context,
+                          icon: Icons.account_balance_wallet,
+                          title: 'Caixa',
+                          route: '/caixa',
+                        ),
+                        _buildNavigationItem(
+                          context,
                           icon: Icons.attach_money,
                           title: 'Financeiro',
                           route: '/financeiro',

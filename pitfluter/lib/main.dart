@@ -7,6 +7,7 @@ import 'presentation/screens/dashboard_screen.dart';
 import 'presentation/screens/pedidos_screen.dart';
 import 'presentation/screens/produtos_screen.dart';
 import 'presentation/screens/novo_pedido_screen.dart';
+import 'presentation/screens/caixa_screen.dart';
 import 'core/constants/supabase_constants.dart';
 
 void main() async {
@@ -63,6 +64,7 @@ class MyApp extends StatelessWidget {
         '/': (context) => const DashboardScreen(),
         '/pedidos': (context) => const PedidosScreen(),
         '/produtos': (context) => const ProdutosScreen(),
+        '/caixa': (context) => const CaixaScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/novo-pedido') {

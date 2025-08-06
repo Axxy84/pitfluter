@@ -10,6 +10,7 @@ import 'presentation/screens/produtos_screen.dart';
 import 'presentation/screens/novo_pedido_screen.dart';
 import 'presentation/screens/caixa_screen.dart';
 import 'presentation/screens/historico_caixas_screen.dart';
+import 'presentation/layouts/main_layout.dart';
 import 'presentation/blocs/pedidos_bloc.dart';
 import 'data/repositories/pedido_repository_impl.dart';
 import 'core/constants/supabase_constants.dart';
@@ -73,7 +74,7 @@ class MyApp extends StatelessWidget {
         ),
         initialRoute: '/',
         routes: {
-          '/': (context) => const DashboardScreen(),
+          '/': (context) => const MainLayout(), // Usando MainLayout com sidebar fixa
           '/pedidos': (context) => const PedidosScreen(),
           '/produtos': (context) => const ProdutosScreen(),
           '/caixa': (context) => const CaixaScreen(),

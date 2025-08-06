@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../debug/database_diagnostic.dart';
+import '../../services/impressao_service.dart';
 
 class NovoPedidoScreen extends StatefulWidget {
   const NovoPedidoScreen({super.key});
@@ -19,6 +20,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   final TextEditingController _nomeGarcomController = TextEditingController();
   final TextEditingController _observacoesController = TextEditingController();
   final TextEditingController _buscaProdutoController = TextEditingController();
+  final TextEditingController _taxaEntregaController = TextEditingController(text: '2.00');
+  final Map<int, TextEditingController> _observacoesItemControllers = {};
   
   String _tipoPedido = 'delivery';
   String? _produtoSelecionado;
@@ -31,6 +34,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   
   final List<Map<String, dynamic>> _carrinho = [];
   double _subtotal = 0.0;
+  double _taxaEntregaEditavel = 2.0;
   String _filtroTexto = '';
   bool _carregandoProdutos = false;
   List<Map<String, dynamic>> _produtosBanco = [];
@@ -72,6 +76,10 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     _nomeGarcomController.dispose();
     _observacoesController.dispose();
     _buscaProdutoController.dispose();
+    _taxaEntregaController.dispose();
+    for (var controller in _observacoesItemControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -257,7 +265,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   double get _taxaEntrega {
     switch (_tipoPedido) {
       case 'delivery':
-        return 2.0;
+        return _taxaEntregaEditavel;
       case 'balcao':
       case 'mesa':
       default:
@@ -367,6 +375,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       'preco': _calcularPreco() / _quantidade,
       'quantidade': _quantidade,
       'total': _calcularPreco(),
+      'observacao': '', // Campo para observações do item
     };
     
     setState(() {
@@ -392,6 +401,23 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   void _removerDoCarrinho(int index) {
     HapticFeedback.lightImpact();
     setState(() {
+      // Remover o controller de observações correspondente
+      if (_observacoesItemControllers.containsKey(index)) {
+        _observacoesItemControllers[index]?.dispose();
+        _observacoesItemControllers.remove(index);
+      }
+      // Reorganizar os controllers restantes
+      final novosControllers = <int, TextEditingController>{};
+      _observacoesItemControllers.forEach((key, value) {
+        if (key > index) {
+          novosControllers[key - 1] = value;
+        } else if (key < index) {
+          novosControllers[key] = value;
+        }
+      });
+      _observacoesItemControllers.clear();
+      _observacoesItemControllers.addAll(novosControllers);
+      
       _carrinho.removeAt(index);
       _calcularSubtotal();
     });
@@ -408,6 +434,114 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       _carrinho[index]['total'] = _carrinho[index]['preco'] * novaQuantidade;
       _calcularSubtotal();
     });
+  }
+
+  /// Prepara dados do pedido para impressão
+  Map<String, dynamic> _prepararDadosPedido() {
+    final agora = DateTime.now();
+    final numeroPedido = '${agora.millisecondsSinceEpoch}'.substring(7); // Últimos 6 dígitos
+    
+    return {
+      'numeroPedido': numeroPedido.padLeft(6, '0'),
+      'dataPedido': agora,
+      'nomeCliente': _clienteController.text.trim().isEmpty 
+          ? 'Cliente não informado' 
+          : _clienteController.text.trim(),
+      'telefoneCliente': null, // Adicionar campo se necessário
+      'enderecoCliente': _tipoPedido == 'delivery' 
+          ? _enderecoController.text.trim() 
+          : null,
+      'itens': _carrinho,
+      'subtotal': _subtotal,
+      'taxaEntrega': _taxaEntrega,
+      'total': _subtotal + _taxaEntrega,
+      'formaPagamento': 'A definir', // Adicionar seleção se necessário
+      'observacoesPedido': _observacoesController.text.trim().isEmpty 
+          ? null 
+          : _observacoesController.text.trim(),
+    };
+  }
+
+  /// Imprime a comanda do pedido
+  Future<void> _imprimirComanda() async {
+    if (_carrinho.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Carrinho vazio - adicione itens primeiro'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      if (!mounted) return;
+      // Mostrar loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Preparando impressão...'),
+            ],
+          ),
+        ),
+      );
+
+      // Preparar dados
+      final dados = _prepararDadosPedido();
+      
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Fechar loading
+      
+      // Imprimir
+      final sucesso = await ImpressaoService.imprimirComanda(
+        numeroPedido: dados['numeroPedido'],
+        dataPedido: dados['dataPedido'],
+        nomeCliente: dados['nomeCliente'],
+        telefoneCliente: dados['telefoneCliente'],
+        enderecoCliente: dados['enderecoCliente'],
+        itens: dados['itens'],
+        subtotal: dados['subtotal'],
+        taxaEntrega: dados['taxaEntrega'],
+        total: dados['total'],
+        formaPagamento: dados['formaPagamento'],
+        observacoesPedido: dados['observacoesPedido'],
+      );
+      
+      if (!mounted) return;
+      if (sucesso) {
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comanda impressa com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao imprimir comanda - tente novamente'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Fechar loading se estiver aberto
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -1510,6 +1644,33 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             ],
           ),
           const SizedBox(height: 8),
+          // Campo de observações
+          TextField(
+            controller: _observacoesItemControllers.putIfAbsent(
+              index,
+              () => TextEditingController(text: item['observacao'] ?? ''),
+            ),
+            decoration: InputDecoration(
+              hintText: 'Ex: Sem cebola, bem assada...',
+              labelText: 'Observações',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+              filled: true,
+              fillColor: Colors.grey[50],
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 8,
+              ),
+            ),
+            maxLines: 2,
+            style: const TextStyle(fontSize: 13),
+            onChanged: (value) {
+              item['observacao'] = value;
+            },
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               IconButton(
@@ -1562,7 +1723,37 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(_getTipoTaxaLabel()),
-                Text('R\$ ${taxaAtual.toStringAsFixed(2)}'),
+                SizedBox(
+                  width: 100,
+                  child: TextFormField(
+                    controller: _taxaEntregaController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    decoration: InputDecoration(
+                      prefixText: 'R\$ ',
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                    ),
+                    onChanged: (value) {
+                      final cleanValue = value.replaceAll(',', '.');
+                      final newValue = double.tryParse(cleanValue);
+                      if (newValue != null && newValue >= 0 && newValue <= 20) {
+                        setState(() {
+                          _taxaEntregaEditavel = newValue;
+                        });
+                      }
+                    },
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 4),
@@ -1597,14 +1788,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: _carrinho.isNotEmpty
-                      ? () {
-                          HapticFeedback.lightImpact();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Comanda impressa!')),
-                          );
-                        }
-                      : null,
+                  onPressed: _carrinho.isNotEmpty ? _imprimirComanda : null,
                   child: const Text('Imprimir'),
                 ),
               ),

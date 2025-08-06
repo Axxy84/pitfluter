@@ -1624,6 +1624,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
               final novoPreco = double.tryParse(controller.text.replaceAll(',', '.'));
               if (novoPreco != null) {
                 await _updatePrice(preco['id'], novoPreco);
+                if (!mounted) return;
                 Navigator.pop(context);
                 _loadPrecos();
               }

@@ -56,7 +56,7 @@ void main() async {
     // 2. LISTAR PIZZAS QUE SERÃO DELETADAS
     for (int i = 0; i < pizzas.length; i++) {
       final pizza = pizzas[i];
-      print('${i + 1:2d}. ${pizza['nome']} - R\$ ${pizza['preco_unitario'] ?? pizza['preco'] ?? 0}');
+      print('${(i + 1).toString().padLeft(2, ' ')}. ${pizza['nome']} - R\$ ${pizza['preco_unitario'] ?? pizza['preco'] ?? 0}');
     }
     
     if (pizzas.isEmpty) {

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/entities/caixa.dart';
 import '../../domain/entities/movimento_caixa.dart';
 import '../../services/relatorio_caixa_service.dart';
+import '../../services/caixa_service.dart';
 
 class CaixaScreen extends StatefulWidget {
   const CaixaScreen({super.key});
@@ -13,91 +15,199 @@ class CaixaScreen extends StatefulWidget {
 
 class _CaixaScreenState extends State<CaixaScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final CaixaService _caixaService = CaixaService();
   Caixa? caixaAtual;
   List<MovimentoCaixa> movimentacoes = [];
   String filtroSelecionado = 'Todas';
+  bool _caixaAberto = false;
+  bool _carregando = true;
 
   @override
   void initState() {
     super.initState();
+    _verificarEstadoCaixa();
     _carregarDados();
   }
-
-  void _carregarDados() {
-    // Dados mockados para demonstração
+  
+  Future<void> _verificarEstadoCaixa() async {
+    if (!mounted) return;
+    
     setState(() {
-      caixaAtual = Caixa(
-        id: 1,
-        dataAbertura: DateTime.now().subtract(const Duration(hours: 8)),
-        saldoInicial: 200.0,
-        saldoFinal: 0.0,
-        totalVendas: 1250.0,
-        totalDinheiro: 450.0,
-        totalCartao: 600.0,
-        totalPix: 200.0,
-        totalSangrias: 100.0,
-        status: StatusCaixa.aberto,
-        observacoes: 'Caixa aberto normalmente',
-        dataCadastro: DateTime.now().toIso8601String(),
-        ultimaAtualizacao: DateTime.now().toIso8601String(),
-      );
-
-      movimentacoes = [
-        MovimentoCaixa(
-          id: 1,
-          caixaId: 1,
-          tipo: TipoMovimento.venda,
-          valor: 67.90,
-          formaPagamento: FormaPagamento.dinheiro,
-          descricao: 'Pedido #0001 - Pizza Margherita',
-          dataHora: DateTime.now().subtract(const Duration(hours: 2, minutes: 45)),
-          dataCadastro: DateTime.now().toIso8601String(),
-        ),
-        MovimentoCaixa(
-          id: 2,
-          caixaId: 1,
-          tipo: TipoMovimento.sangria,
-          valor: 100.0,
-          formaPagamento: FormaPagamento.dinheiro,
-          descricao: 'Sangria para troco',
-          dataHora: DateTime.now().subtract(const Duration(hours: 1, minutes: 30)),
-          dataCadastro: DateTime.now().toIso8601String(),
-        ),
-        MovimentoCaixa(
-          id: 3,
-          caixaId: 1,
-          tipo: TipoMovimento.venda,
-          valor: 45.0,
-          formaPagamento: FormaPagamento.cartao,
-          descricao: 'Pedido #0002 - Pizza Calabresa',
-          dataHora: DateTime.now().subtract(const Duration(minutes: 45)),
-          dataCadastro: DateTime.now().toIso8601String(),
-        ),
-      ];
+      _carregando = true;
     });
+    
+    try {
+      final estadoCaixa = await _caixaService.verificarEstadoCaixa();
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _caixaAberto = estadoCaixa.aberto;
+        _carregando = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() {
+        _carregando = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao verificar estado do caixa: $e')),
+      );
+    }
+  }
+
+  Future<void> _carregarDados() async {
+    if (!_caixaAberto) {
+      setState(() {
+        caixaAtual = null;
+        movimentacoes = [];
+      });
+      return;
+    }
+    
+    try {
+      final dadosCaixa = await _caixaService.obterDadosCaixaAtual();
+      final estado = dadosCaixa['estado'] as EstadoCaixa;
+      final resumo = dadosCaixa['resumo'] as ResumoCaixa;
+      
+      // Buscar movimentações reais do período
+      final movimentacoesReais = await _buscarMovimentacoesCaixa(estado.id!, estado.dataAbertura!);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        caixaAtual = Caixa(
+          id: estado.id ?? 0,
+          dataAbertura: DateTime.parse(estado.dataAbertura!),
+          saldoInicial: estado.saldoInicial ?? 0,
+          saldoFinal: resumo.saldoFinal,
+          totalVendas: resumo.totalVendas,
+          totalDinheiro: resumo.totalDinheiro,
+          totalCartao: resumo.totalCartao,
+          totalPix: resumo.totalPix,
+          totalSangrias: 0.0,
+          status: StatusCaixa.aberto,
+          observacoes: '',
+          dataCadastro: DateTime.now().toIso8601String(),
+          ultimaAtualizacao: DateTime.now().toIso8601String(),
+        );
+        
+        movimentacoes = movimentacoesReais;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao carregar dados do caixa: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+  
+  Future<List<MovimentoCaixa>> _buscarMovimentacoesCaixa(int caixaId, String dataAbertura) async {
+    final movimentacoes = <MovimentoCaixa>[];
+    
+    // Adicionar abertura de caixa
+    final estado = await _caixaService.verificarEstadoCaixa();
+    movimentacoes.add(
+      MovimentoCaixa(
+        id: 1,
+        caixaId: caixaId,
+        tipo: TipoMovimento.abertura,
+        valor: estado.saldoInicial ?? 0,
+        formaPagamento: FormaPagamento.dinheiro,
+        descricao: 'Abertura de caixa',
+        dataHora: DateTime.parse(dataAbertura),
+        dataCadastro: dataAbertura,
+      ),
+    );
+    
+    try {
+      // Buscar vendas do período
+      final supabase = Supabase.instance.client;
+      final vendas = await supabase
+          .from('pedidos')
+          .select()
+          .gte('data_pedido', dataAbertura)
+          .neq('status', 'Cancelado')
+          .order('data_pedido');
+      
+      for (final venda in vendas) {
+        movimentacoes.add(
+          MovimentoCaixa(
+            id: venda['id'],
+            caixaId: caixaId,
+            tipo: TipoMovimento.venda,
+            valor: (venda['total'] ?? 0).toDouble(),
+            formaPagamento: _parseFormaPagamento(venda['forma_pagamento']),
+            descricao: 'Pedido #${venda['id']}',
+            dataHora: DateTime.parse(venda['data_pedido']),
+            dataCadastro: venda['data_pedido'],
+          ),
+        );
+      }
+    } catch (e) {
+      // Tabela pedidos não existe - isso é normal
+      // O caixa funcionará apenas com a movimentação de abertura
+    }
+    
+    return movimentacoes;
+  }
+  
+  FormaPagamento _parseFormaPagamento(String? forma) {
+    switch (forma) {
+      case 'Dinheiro':
+        return FormaPagamento.dinheiro;
+      case 'Cartão':
+        return FormaPagamento.cartao;
+      case 'PIX':
+        return FormaPagamento.pix;
+      default:
+        return FormaPagamento.dinheiro;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_carregando) {
+      return Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: const Color(0xFFF5F7FA),
+        drawer: _buildDrawer(context),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: const Color(0xFFF5F7FA),
       drawer: _buildDrawer(context),
-      body: Column(
-        children: [
-          // Header
-          _buildHeader(),
-          
-          // Main Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Coluna Esquerda - Resumo
-                  Expanded(
-                    flex: 1,
+      body: _caixaAberto ? _buildCaixaAberto() : _buildCaixaFechado(),
+    );
+  }
+  
+  Widget _buildCaixaAberto() {
+    return Column(
+      children: [
+        // Header
+        _buildHeader(),
+        
+        // Main Content
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Coluna Esquerda - Resumo
+                Expanded(
+                  flex: 1,
                     child: SingleChildScrollView(
                       child: _buildResumoCards(),
                     ),
@@ -114,16 +224,15 @@ class _CaixaScreenState extends State<CaixaScreen> {
               ),
             ),
           ),
-          
-          // Footer - Ações Rápidas
-          _buildFooter(),
-        ],
-      ),
+        
+        // Footer - Ações Rápidas
+        _buildFooter(),
+      ],
     );
   }
 
   Widget _buildHeader() {
-    final isAberto = caixaAtual?.estaAberto ?? false;
+    final isAberto = _caixaAberto;
     
     return Container(
       padding: const EdgeInsets.all(24.0),
@@ -603,7 +712,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
   }
 
   Widget _buildFooter() {
-    final isAberto = caixaAtual?.estaAberto ?? false;
+    final isAberto = _caixaAberto;
     
     return Container(
       padding: const EdgeInsets.all(24),
@@ -792,9 +901,13 @@ class _CaixaScreenState extends State<CaixaScreen> {
       );
 
       await RelatorioCaixaService.imprimirRelatorio(caixaAtual!, movimentacoes);
+      
+      if (!mounted) return;
       Navigator.of(context).pop();
       
     } catch (e) {
+      if (!mounted) return;
+      
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -829,6 +942,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
       await RelatorioCaixaService.imprimirRelatorio(caixaAtual!, movimentacoes);
       
       // Fechar loading
+      if (!mounted) return;
       Navigator.of(context).pop();
       
       ScaffoldMessenger.of(context).showSnackBar(
@@ -839,6 +953,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
       );
     } catch (e) {
       // Fechar loading se ainda estiver aberto
+      if (!mounted) return;
       Navigator.of(context).pop();
       
       ScaffoldMessenger.of(context).showSnackBar(
@@ -887,15 +1002,45 @@ class _CaixaScreenState extends State<CaixaScreen> {
           child: const Text('Cancelar'),
         ),
         ElevatedButton(
-          onPressed: () {
-            // Implementar lógica de abertura
+          onPressed: () async {
+            final valor = double.tryParse(valorController.text.replaceAll(',', '.')) ?? 0;
+            final observacoes = observacoesController.text;
+            
+            if (valor <= 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Por favor, informe um valor inicial válido'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              return;
+            }
+            
             Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Caixa aberto com sucesso!'),
-                backgroundColor: Colors.green,
-              ),
-            );
+            
+            try {
+              await _caixaService.abrirCaixa(valor, observacoes);
+              await _verificarEstadoCaixa();
+              await _carregarDados();
+              
+              if (!mounted) return;
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Caixa aberto com sucesso!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } catch (e) {
+              if (!mounted) return;
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Erro ao abrir caixa: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           },
           child: const Text('Confirmar Abertura'),
         ),
@@ -949,15 +1094,32 @@ class _CaixaScreenState extends State<CaixaScreen> {
           child: const Text('Cancelar'),
         ),
         ElevatedButton(
-          onPressed: () {
-            // Implementar lógica de fechamento
+          onPressed: () async {
             Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Caixa fechado com sucesso!'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            
+            try {
+              await _caixaService.fecharCaixa();
+              await _verificarEstadoCaixa();
+              await _carregarDados();
+              
+              if (!mounted) return;
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Caixa fechado com sucesso!'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            } catch (e) {
+              if (!mounted) return;
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Erro ao fechar caixa: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           },
           child: const Text('Confirmar Fechamento'),
         ),
@@ -1112,6 +1274,37 @@ class _CaixaScreenState extends State<CaixaScreen> {
           child: const Text('Registrar'),
         ),
       ],
+    );
+  }
+  
+  Widget _buildCaixaFechado() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.lock,
+            size: 100,
+            color: Colors.grey,
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Caixa Fechado',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _abrirCaixa,
+            icon: const Icon(Icons.lock_open),
+            label: const Text('Abrir Caixa'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

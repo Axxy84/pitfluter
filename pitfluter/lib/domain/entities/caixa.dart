@@ -42,6 +42,15 @@ class Caixa extends Equatable {
   double get saldoAtual => saldoInicial + totalVendas - totalSangrias;
   double get diferencaCaixa => saldoFinal - saldoAtual;
 
+  String generateReportNumber() {
+    final now = DateTime.now();
+    final dateString = now.year.toString() + 
+        now.month.toString().padLeft(2, '0') + 
+        now.day.toString().padLeft(2, '0');
+    
+    return 'FC-$dateString-${id.toString().padLeft(3, '0')}';
+  }
+
   Caixa copyWith({
     int? id,
     DateTime? dataAbertura,

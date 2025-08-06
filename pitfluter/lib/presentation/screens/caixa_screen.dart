@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/caixa.dart';
 import '../../domain/entities/movimento_caixa.dart';
+import '../../services/relatorio_caixa_service.dart';
 
 class CaixaScreen extends StatefulWidget {
   const CaixaScreen({super.key});
@@ -11,6 +12,7 @@ class CaixaScreen extends StatefulWidget {
 }
 
 class _CaixaScreenState extends State<CaixaScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Caixa? caixaAtual;
   List<MovimentoCaixa> movimentacoes = [];
   String filtroSelecionado = 'Todas';
@@ -78,6 +80,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFFF5F7FA),
       drawer: _buildDrawer(context),
       body: Column(
@@ -139,7 +142,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
           // Botão Menu
           IconButton(
             icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
             iconSize: 28,
           ),
           
@@ -643,13 +646,14 @@ class _CaixaScreenState extends State<CaixaScreen> {
           const SizedBox(width: 16),
           
           ElevatedButton.icon(
-            onPressed: _imprimirRelatorio,
+            onPressed: caixaAtual != null ? _mostrarOpcoesRelatorio : null,
             icon: const Icon(Icons.print),
             label: const Text('Imprimir Relatório'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue[600],
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              elevation: 2,
             ),
           ),
           
@@ -731,13 +735,119 @@ class _CaixaScreenState extends State<CaixaScreen> {
     );
   }
 
-  void _imprimirRelatorio() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Relatório será implementado em breve'),
-        backgroundColor: Colors.blue,
+  void _mostrarOpcoesRelatorio() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.print, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('Opções de Relatório'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.print, color: Colors.blue),
+              title: const Text('Imprimir Relatório'),
+              subtitle: const Text('Enviar para impressora'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _imprimirRelatorio();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.visibility, color: Colors.green),
+              title: const Text('Visualizar Relatório'),
+              subtitle: const Text('Pré-visualizar antes de imprimir'),
+              onTap: () {
+                Navigator.of(context).pop();
+                _visualizarRelatorio();
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar'),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _visualizarRelatorio() async {
+    if (caixaAtual == null) return;
+
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      await RelatorioCaixaService.imprimirRelatorio(caixaAtual!, movimentacoes);
+      Navigator.of(context).pop();
+      
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao visualizar relatório: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _imprimirRelatorio() async {
+    if (caixaAtual == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nenhum caixa disponível para imprimir'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Mostrar loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      await RelatorioCaixaService.imprimirRelatorio(caixaAtual!, movimentacoes);
+      
+      // Fechar loading
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Relatório gerado com sucesso!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      // Fechar loading se ainda estiver aberto
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao gerar relatório: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildDialogAbrirCaixa() {

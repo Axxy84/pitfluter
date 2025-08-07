@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../widgets/dashboard_content.dart';
 import '../widgets/produtos_content.dart';
 import '../widgets/pedidos_content.dart';
+import '../screens/caixa_screen.dart';
+import '../screens/historico_caixas_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -12,6 +14,23 @@ class MainLayout extends StatefulWidget {
 
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
+  
+  Widget _buildContent() {
+    switch (_selectedIndex) {
+      case 0:
+        return const _DashboardContent();
+      case 1:
+        return const _PedidosContent();
+      case 2:
+        return const _ProdutosContent();
+      case 3:
+        return const _CaixaContent();
+      case 4:
+        return const _HistoricoContent();
+      default:
+        return const _DashboardContent();
+    }
+  }
   
   final List<_NavigationItem> _navigationItems = [
     _NavigationItem(
@@ -196,18 +215,9 @@ class _MainLayoutState extends State<MainLayout> {
             ),
           ),
           
-          // Content Area - IndexedStack mantém widgets vivos
+          // Content Area - Renderização dinâmica para evitar conflitos de ticker
           Expanded(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: const [
-                _DashboardContent(),
-                _PedidosContent(),
-                _ProdutosContent(),
-                _CaixaContent(),
-                _HistoricoContent(),
-              ],
-            ),
+            child: _buildContent(),
           ),
         ],
       ),
@@ -260,9 +270,7 @@ class _CaixaContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Caixa Content'),
-    );
+    return const CaixaScreen();
   }
 }
 
@@ -271,8 +279,6 @@ class _HistoricoContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text('Histórico Content'),
-    );
+    return const HistoricoCaixasScreen();
   }
 }

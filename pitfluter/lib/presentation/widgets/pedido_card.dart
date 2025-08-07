@@ -137,34 +137,24 @@ class PedidoCard extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(PedidoStatus status) {
-    switch (status) {
-      case PedidoStatus.recebido:
+  Color _getStatusColor(String status) {
+    // Status simplificado
+    switch (status.toLowerCase()) {
+      case 'aberto':
         return Colors.blue;
-      case PedidoStatus.preparando:
+      case 'preparando':
         return Colors.orange;
-      case PedidoStatus.saindo:
-        return Colors.purple;
-      case PedidoStatus.entregue:
+      case 'finalizado':
         return Colors.green;
-      case PedidoStatus.cancelado:
+      case 'cancelado':
         return Colors.red;
+      default:
+        return Colors.grey;
     }
   }
 
-  String _getStatusText(PedidoStatus status) {
-    switch (status) {
-      case PedidoStatus.recebido:
-        return 'RECEBIDO';
-      case PedidoStatus.preparando:
-        return 'PREPARANDO';
-      case PedidoStatus.saindo:
-        return 'SAINDO';
-      case PedidoStatus.entregue:
-        return 'ENTREGUE';
-      case PedidoStatus.cancelado:
-        return 'CANCELADO';
-    }
+  String _getStatusText(String status) {
+    return status.toUpperCase();
   }
 
   IconData _getTypeIcon(TipoPedido tipo) {

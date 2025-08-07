@@ -1,13 +1,5 @@
 import 'package:equatable/equatable.dart';
 
-enum PedidoStatus {
-  recebido,
-  preparando,
-  saindo,
-  entregue,
-  cancelado,
-}
-
 enum TipoPedido {
   entrega,
   balcao,
@@ -24,7 +16,7 @@ class Pedido extends Equatable {
   final double desconto;
   final double total;
   final String formaPagamento;
-  final PedidoStatus status;
+  final String status; // Simplificado para string
   final TipoPedido tipo;
   final String? observacoes;
   final DateTime dataHoraCriacao;
@@ -54,13 +46,7 @@ class Pedido extends Equatable {
     return subtotal + taxaEntrega - desconto;
   }
 
-  bool get estaEmAndamento {
-    return status != PedidoStatus.entregue && status != PedidoStatus.cancelado;
-  }
-
-  bool get podeCancelar {
-    return status == PedidoStatus.recebido || status == PedidoStatus.preparando;
-  }
+  // Removidas funções relacionadas a status
 
   Pedido copyWith({
     int? id,
@@ -73,7 +59,7 @@ class Pedido extends Equatable {
     double? desconto,
     double? total,
     String? formaPagamento,
-    PedidoStatus? status,
+    String? status,
     TipoPedido? tipo,
     String? observacoes,
     DateTime? dataHoraCriacao,

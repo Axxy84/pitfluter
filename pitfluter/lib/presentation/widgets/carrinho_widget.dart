@@ -48,7 +48,7 @@ class CarrinhoWidget extends StatelessWidget {
   final List<CarrinhoItem> itens;
   final Function(CarrinhoItem item, int quantidade) onQuantidadeChanged;
   final Function(CarrinhoItem item) onItemRemoved;
-  final VoidCallback onFinalizarPedido;
+  final VoidCallback onSalvarPedido;
   final bool showAsBottomSheet;
 
   const CarrinhoWidget({
@@ -56,7 +56,7 @@ class CarrinhoWidget extends StatelessWidget {
     required this.itens,
     required this.onQuantidadeChanged,
     required this.onItemRemoved,
-    required this.onFinalizarPedido,
+    required this.onSalvarPedido,
     this.showAsBottomSheet = false,
   });
 
@@ -324,7 +324,7 @@ class CarrinhoWidget extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: itens.isEmpty ? null : onFinalizarPedido,
+              onPressed: itens.isEmpty ? null : onSalvarPedido,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFDC2626),
                 foregroundColor: Colors.white,
@@ -334,7 +334,7 @@ class CarrinhoWidget extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                'Finalizar Pedido',
+                'Salvar Pedido',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -362,7 +362,7 @@ void showCarrinhoBottomSheet({
   required List<CarrinhoItem> itens,
   required Function(CarrinhoItem item, int quantidade) onQuantidadeChanged,
   required Function(CarrinhoItem item) onItemRemoved,
-  required VoidCallback onFinalizarPedido,
+  required VoidCallback onSalvarPedido,
 }) {
   showModalBottomSheet(
     context: context,
@@ -376,7 +376,7 @@ void showCarrinhoBottomSheet({
         itens: itens,
         onQuantidadeChanged: onQuantidadeChanged,
         onItemRemoved: onItemRemoved,
-        onFinalizarPedido: onFinalizarPedido,
+        onSalvarPedido: onSalvarPedido,
         showAsBottomSheet: true,
       ),
     ),

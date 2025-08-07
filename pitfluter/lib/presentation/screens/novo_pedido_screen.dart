@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../debug/database_diagnostic.dart';
+// import '../../debug/database_diagnostic.dart'; // Comentado - muito verboso
 import '../../services/impressao_service.dart';
 
 class NovoPedidoScreen extends StatefulWidget {
@@ -89,47 +89,59 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     });
     
     try {
-      // Primeiro, executar diagnóstico
-      await DatabaseDiagnostic.runDiagnostic();
+      // Diagnóstico comentado - muito verboso
+      // await DatabaseDiagnostic.runDiagnostic();
       
       final supabase = Supabase.instance.client;
       
       // Usar a MESMA query que funciona na tela de produtos!
       
-      // Query para produtos (usando tabelas corretas)
+      // Query para produtos - mesma que funciona na tela de produtos
       final produtosResponse = await supabase
-          .from('produtos')
-          .select('*, categorias(id, nome)')
+          .from('produtos_produto')
+          .select('''
+            *,
+            produtos_produtopreco (
+              preco,
+              preco_promocional,
+              tamanho_id,
+              produtos_tamanho (
+                nome
+              )
+            ),
+            produtos_categoria (
+              id,
+              nome
+            )
+          ''')
           .eq('ativo', true)
           .order('nome');
       
       
       setState(() {
         _produtosBanco = produtosResponse.map((produto) {
-          final categoria = produto['categorias'];
+          // Usar produtos_categoria ao invés de categorias
+          final categoria = produto['produtos_categoria'];
           final categoriaNome = categoria?['nome'] ?? 'Outros';
           
-          // Extrair preço do campo correto
-          double precoBase = 25.0; // Default
-          if (produto['preco_unitario'] != null) {
-            precoBase = (produto['preco_unitario'] as num).toDouble();
-          }
-          
-          // Se for Pizza Delivery, preço base é sempre R$ 40,00
-          if (categoriaNome.toLowerCase().contains('delivery')) {
-            precoBase = 40.0;
+          // Extrair preço dos preços relacionados
+          double precoBase = 40.0; // Preço padrão das pizzas promocionais
+          final precos = produto['produtos_produtopreco'] as List?;
+          if (precos != null && precos.isNotEmpty) {
+            // Pegar o preço promocional se existir, senão o preço normal
+            precoBase = (precos[0]['preco_promocional'] ?? precos[0]['preco'] ?? 40.0).toDouble();
           }
           
           return {
             'id': produto['id'],
             'nome': produto['nome'] as String,
-            'descricao': produto['descricao'] ?? '',
+            'descricao': produto['descricao'] ?? produto['ingredientes'] ?? '',
             'preco': precoBase,
-            'categoriaId': categoria?['id'],
+            'categoriaId': produto['categoria_id'],
             'categoriaNome': categoriaNome,
-            'imagemUrl': produto['imagem_url'],
+            'imagemUrl': produto['imagem'],
             'imagem': _getEmojiPorCategoria(categoriaNome),
-            'tipoProduto': produto['tipo_produto'] ?? '',
+            'tipoProduto': produto['tipo_produto'] ?? 'pizza',
           };
         }).toList();
         _carregandoProdutos = false;
@@ -1800,14 +1812,14 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                   onPressed: _carrinho.isNotEmpty && _validarPedido()
                       ? () {
                           HapticFeedback.lightImpact();
-                          _finalizarPedido();
+                          _salvarPedido();
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('Finalizar'),
+                  child: const Text('Salvar Pedido'),
                 ),
               ),
             ],
@@ -1830,7 +1842,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     }
   }
 
-  Future<void> _finalizarPedido() async {
+  Future<void> _salvarPedido() async {
     if (_carrinho.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1898,7 +1910,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         'numero': numeroPedido,
         'subtotal': _subtotal,
         'total': _subtotal + (_tipoPedido == 'delivery' ? _taxaEntregaEditavel : 0.0),
-        'status': 'recebido',
+        'status': 'aberto', // Status simplificado
         'data_hora_criacao': agora.toIso8601String(),
       };
 

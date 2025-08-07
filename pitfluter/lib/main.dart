@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,8 +10,6 @@ import 'presentation/screens/novo_pedido_screen.dart';
 import 'presentation/screens/caixa_screen.dart';
 import 'presentation/screens/historico_caixas_screen.dart';
 import 'presentation/layouts/main_layout.dart';
-import 'presentation/blocs/pedidos_bloc.dart';
-import 'data/repositories/pedido_repository_impl.dart';
 import 'core/constants/supabase_constants.dart';
 
 void main() async {
@@ -52,15 +49,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          create: (context) => PedidosBloc(
-            repository: PedidoRepositoryImpl(),
-          )..add(CarregarPedidos()),
-        ),
-      ],
-      child: MaterialApp(
+    return MaterialApp(
         title: 'Pizzaria Sistema',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
@@ -89,8 +78,7 @@ class MyApp extends StatelessWidget {
           }
           return null;
         },
-      ),
-    );
+      );
   }
 }
 

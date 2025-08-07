@@ -44,43 +44,60 @@ class _ProdutosContentState extends State<ProdutosContent>
     });
 
     try {
+      // Primeiro carregar produtos com seus preços da tabela relacionada
+      final produtosResponse = await supabase
+          .from('produtos_produto')
+          .select('''
+            *,
+            produtos_produtopreco (
+              preco,
+              preco_promocional,
+              tamanho_id,
+              produtos_tamanho (
+                nome
+              )
+            )
+          ''')
+          .order('nome');
+
+      produtos = List<Map<String, dynamic>>.from(produtosResponse);
+      
+      // Debug: ver estrutura dos produtos
+      if (produtos.isNotEmpty) {
+        print('Exemplo de produto: ${produtos.first}');
+        print('Campos do produto: ${produtos.first.keys.toList()}');
+      }
+      
       // Carregar categorias
       final todasCategoriasResponse = await supabase
-          .from('categorias')
+          .from('produtos_categoria')
           .select('*')
           .eq('ativo', true)
           .order('nome');
 
       final todasCategorias = List<Map<String, dynamic>>.from(todasCategoriasResponse);
       
-      // Mapear categorias
-      final mapeamentoCategorias = {
-        'Pizzas': ['pizza', 'pizzas especiais', 'pizzas salgadas', 'pizzas doces'],
-        'Refrigerantes': ['bebida', 'bebidas', 'drink', 'drinks', 'cerveja', 'cervejas'],
-        'Sucos': ['suco', 'sucos', 'juice', 'juices', 'natural'],
-        'Bordas': ['borda', 'bordas', 'bordas recheadas'],
-      };
+      // Usar as categorias reais do banco, mas filtrar Sobremesas se não tiver produtos
+      categorias = todasCategorias.map((cat) => {
+        'id': cat['id'],
+        'nome': cat['nome'],
+      }).toList();
       
-      categorias = [];
+      // Opcional: remover categoria Sobremesas se não houver produtos nela
+      final catSobremesa = todasCategorias.firstWhere(
+        (c) => c['nome'].toString().toLowerCase().contains('sobremesa'),
+        orElse: () => {},
+      );
       
-      for (String categoriaDesejada in mapeamentoCategorias.keys) {
-        final palavrasChave = mapeamentoCategorias[categoriaDesejada]!;
-        
-        final categoriaEncontrada = todasCategorias.firstWhere(
-          (cat) => palavrasChave.any((palavra) => 
-            cat['nome']?.toString().toLowerCase().contains(palavra.toLowerCase()) == true
-          ),
-          orElse: () => <String, dynamic>{},
-        );
-        
-        if (categoriaEncontrada.isNotEmpty) {
-          categorias.add({
-            'id': categoriaEncontrada['id'],
-            'nome': categoriaDesejada,
-            'nome_banco': categoriaEncontrada['nome'],
-          });
+      if (catSobremesa.isNotEmpty) {
+        final produtosSobremesa = produtos.where((p) => p['categoria_id'] == catSobremesa['id']).toList();
+        if (produtosSobremesa.isEmpty) {
+          categorias.removeWhere((c) => c['id'] == catSobremesa['id']);
         }
       }
+      
+      print('Total de categorias: ${categorias.length}');
+      print('Categorias: ${categorias.map((c) => c['nome']).toList()}');
       
       // Inicializar ou atualizar TabController
       if (_tabController == null) {
@@ -122,19 +139,15 @@ class _ProdutosContentState extends State<ProdutosContent>
         });
       }
 
-      // Carregar produtos
-      final produtosResponse = await supabase
-          .from('produtos')
-          .select('*, categorias(*)')
-          .order('nome');
-
-      produtos = List<Map<String, dynamic>>.from(produtosResponse);
+      // Produtos já foram carregados no início
       _filterProdutos();
 
       setState(() {
         isLoading = false;
       });
     } catch (e) {
+      print('Erro ao carregar dados: $e');
+      print('Tipo do erro: ${e.runtimeType}');
       setState(() {
         error = e.toString();
         isLoading = false;
@@ -468,15 +481,40 @@ class _ProdutoCard extends StatelessWidget {
                     
                     const Spacer(),
                     
-                    // Preço
-                    Text(
-                      'R\$ ${(produto['preco'] ?? 0).toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                      ),
-                    ),
+                    // Preço - usando produtos_produtopreco
+                    Builder(builder: (context) {
+                      // Pegar o primeiro preço disponível
+                      final precos = produto['produtos_produtopreco'] as List?;
+                      double? preco;
+                      
+                      if (precos != null && precos.isNotEmpty) {
+                        // Pegar o preço promocional se existir, senão o preço normal
+                        preco = precos[0]['preco_promocional'] ?? precos[0]['preco'];
+                      }
+                      
+                      // Se não tiver na tabela relacionada, tentar preco_unitario
+                      preco ??= produto['preco_unitario'];
+                      
+                      if (preco != null) {
+                        return Text(
+                          'R\$ ${preco.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
+                          ),
+                        );
+                      } else {
+                        return Text(
+                          'Consulte',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontStyle: FontStyle.italic,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        );
+                      }
+                    }),
                     
                     const SizedBox(height: 4),
                     

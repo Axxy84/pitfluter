@@ -46,7 +46,7 @@ class _ProdutosContentState extends State<ProdutosContent>
     try {
       // Carregar categorias
       final todasCategoriasResponse = await supabase
-          .from('produtos_categoria')
+          .from('categorias')
           .select('*')
           .eq('ativo', true)
           .order('nome');
@@ -82,25 +82,50 @@ class _ProdutosContentState extends State<ProdutosContent>
         }
       }
       
-      // Inicializar TabController
-      _tabController = TabController(
-        length: categorias.length + 1,
-        vsync: this,
-      );
-      
-      _tabController?.addListener(() {
-        setState(() {
-          selectedCategoriaId = _tabController!.index == 0 
-              ? 0 
-              : categorias[_tabController!.index - 1]['id'];
+      // Inicializar ou atualizar TabController
+      if (_tabController == null) {
+        // Criar novo controller se não existir
+        _tabController = TabController(
+          length: categorias.length + 1,
+          vsync: this,
+        );
+        
+        _tabController?.addListener(() {
+          if (mounted) {
+            setState(() {
+              selectedCategoriaId = _tabController!.index == 0 
+                  ? 0 
+                  : categorias[_tabController!.index - 1]['id'];
+            });
+            _filterProdutos();
+          }
         });
-        _filterProdutos();
-      });
+      } else if (_tabController!.length != categorias.length + 1) {
+        // Se o número de categorias mudou, recriar o controller
+        final oldIndex = _tabController!.index;
+        _tabController?.dispose();
+        _tabController = TabController(
+          length: categorias.length + 1,
+          vsync: this,
+          initialIndex: oldIndex.clamp(0, categorias.length),
+        );
+        
+        _tabController?.addListener(() {
+          if (mounted) {
+            setState(() {
+              selectedCategoriaId = _tabController!.index == 0 
+                  ? 0 
+                  : categorias[_tabController!.index - 1]['id'];
+            });
+            _filterProdutos();
+          }
+        });
+      }
 
       // Carregar produtos
       final produtosResponse = await supabase
           .from('produtos')
-          .select('*, produtos_categoria(*)')
+          .select('*, categorias(*)')
           .order('nome');
 
       produtos = List<Map<String, dynamic>>.from(produtosResponse);
@@ -215,10 +240,10 @@ class _ProdutosContentState extends State<ProdutosContent>
               ),
               
               // Tabs de categorias
-              if (_tabController != null) ...[
+              if (_tabController != null && categorias.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 TabBar(
-                  controller: _tabController,
+                  controller: _tabController!,
                   isScrollable: true,
                   labelColor: colorScheme.primary,
                   unselectedLabelColor: colorScheme.onSurfaceVariant,
@@ -359,7 +384,7 @@ class _ProdutoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final categoria = produto['produtos_categoria'];
+    final categoria = produto['categorias'];
     
     return Card(
       elevation: 0,

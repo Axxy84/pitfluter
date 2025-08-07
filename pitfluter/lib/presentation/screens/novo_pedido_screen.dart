@@ -98,15 +98,15 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       
       // Query para produtos (usando tabelas corretas)
       final produtosResponse = await supabase
-          .from('produtos_produto')
-          .select('*, produtos_categoria(id, nome)')
+          .from('produtos')
+          .select('*, categorias(id, nome)')
           .eq('ativo', true)
           .order('nome');
       
       
       setState(() {
         _produtosBanco = produtosResponse.map((produto) {
-          final categoria = produto['produtos_categoria'];
+          final categoria = produto['categorias'];
           final categoriaNome = categoria?['nome'] ?? 'Outros';
           
           // Extrair preço do campo correto
@@ -137,9 +137,11 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       
       
     } catch (e) {
-      setState(() {
-        _carregandoProdutos = false;
-      });
+      if (mounted) {
+        setState(() {
+          _carregandoProdutos = false;
+        });
+      }
       
       // Mostrar erro e usar dados mockados como fallback
       if (mounted) {
@@ -1828,43 +1830,165 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     }
   }
 
-  void _finalizarPedido() {
-    // Preparar dados do pedido
-    final dadosPedido = {
-      'tipo': _tipoPedido,
-      'cliente': _clienteController.text.trim(),
-      'itens': _carrinho,
-      'subtotal': _subtotal,
-      'taxaEntrega': _taxaEntrega,
-      'total': _subtotal + _taxaEntrega,
-      'tempoEstimado': _tempoEstimado,
-    };
-
-    // Adicionar campos específicos por tipo
-    switch (_tipoPedido) {
-      case 'delivery':
-        dadosPedido['endereco'] = _enderecoController.text.trim();
-        dadosPedido['observacoesEntrega'] = _observacoesController.text.trim();
-        break;
-      case 'balcao':
-        dadosPedido['nomeRetirada'] = _nomeRetiradaController.text.trim();
-        break;
-      case 'mesa':
-        dadosPedido['mesa'] = _mesaSelecionada;
-        dadosPedido['garcom'] = _nomeGarcomController.text.trim();
-        break;
+  Future<void> _finalizarPedido() async {
+    if (_carrinho.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Adicione pelo menos um item ao pedido'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
     }
 
-    // Simular envio do pedido
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_getMensagemSucesso()),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
       ),
     );
 
-    Navigator.pop(context);
+    try {
+      // Preparar dados do pedido para o banco
+      final agora = DateTime.now();
+      final numeroPedido = '${agora.millisecondsSinceEpoch}'.substring(7).padLeft(6, '0');
+      
+      String nomeCliente = _clienteController.text.trim();
+      if (nomeCliente.isEmpty) {
+        nomeCliente = _tipoPedido == 'balcao' ? _nomeRetiradaController.text.trim() : 'Cliente não informado';
+      }
+
+      // Definir tipo do pedido baseado na seleção
+      String tipoPedidoDb;
+      switch (_tipoPedido) {
+        case 'delivery':
+          tipoPedidoDb = 'entrega';
+          break;
+        case 'balcao':
+          tipoPedidoDb = 'balcao';
+          break;
+        case 'mesa':
+          tipoPedidoDb = 'balcao'; // Mesa será tratado como balcão no banco
+          break;
+        default:
+          tipoPedidoDb = 'balcao';
+      }
+
+      // Preparar observações
+      String observacoes = '';
+      if (_observacoesController.text.trim().isNotEmpty) {
+        observacoes = _observacoesController.text.trim();
+      }
+      if (_tipoPedido == 'delivery' && _enderecoController.text.trim().isNotEmpty) {
+        observacoes += '\nEndereço: ${_enderecoController.text.trim()}';
+      }
+      if (_tipoPedido == 'mesa') {
+        observacoes += '\nMesa: $_mesaSelecionada';
+        if (_nomeGarcomController.text.trim().isNotEmpty) {
+          observacoes += '\nGarçom: ${_nomeGarcomController.text.trim()}';
+        }
+      }
+
+      final supabase = Supabase.instance.client;
+
+      // Preparar dados básicos do pedido compatíveis com estrutura existente
+      final pedidoData = <String, dynamic>{
+        'numero': numeroPedido,
+        'subtotal': _subtotal,
+        'total': _subtotal + (_tipoPedido == 'delivery' ? _taxaEntregaEditavel : 0.0),
+        'status': 'recebido',
+        'data_hora_criacao': agora.toIso8601String(),
+      };
+
+      // Adicionar colunas opcionais apenas se existirem na tabela
+      try {
+        // Verificar estrutura da tabela primeiro
+        final estrutura = await supabase
+            .from('pedidos')
+            .select('*')
+            .limit(1)
+            .maybeSingle();
+
+        if (estrutura != null) {
+          // Adicionar colunas baseado na estrutura existente
+          final colunas = estrutura.keys.toSet();
+          
+          if (colunas.contains('cliente_id')) pedidoData['cliente_id'] = null;
+          if (colunas.contains('endereco_id')) pedidoData['endereco_id'] = null;
+          if (colunas.contains('mesa_id')) pedidoData['mesa_id'] = _tipoPedido == 'mesa' ? _mesaSelecionada : null;
+          if (colunas.contains('taxa_entrega')) pedidoData['taxa_entrega'] = _tipoPedido == 'delivery' ? _taxaEntregaEditavel : 0.0;
+          if (colunas.contains('desconto')) pedidoData['desconto'] = 0.0;
+          if (colunas.contains('forma_pagamento')) pedidoData['forma_pagamento'] = 'Dinheiro';
+          if (colunas.contains('tipo')) pedidoData['tipo'] = tipoPedidoDb;
+          if (colunas.contains('observacoes')) pedidoData['observacoes'] = observacoes.trim().isEmpty ? null : observacoes.trim();
+          if (colunas.contains('data_hora_atualizacao')) pedidoData['data_hora_atualizacao'] = agora.toIso8601String();
+          if (colunas.contains('nome_cliente')) pedidoData['nome_cliente'] = nomeCliente;
+          if (colunas.contains('telefone_cliente')) pedidoData['telefone_cliente'] = null;
+        }
+      } catch (e) {
+        print('Aviso: Não foi possível verificar estrutura da tabela: $e');
+      }
+
+      // Inserir pedido
+      final pedidoResponse = await supabase
+          .from('pedidos')
+          .insert(pedidoData)
+          .select()
+          .single();
+
+      final pedidoId = pedidoResponse['id'];
+
+      // Tentar inserir itens se a tabela existe
+      try {
+        final itensData = _carrinho.map((item) {
+          return {
+            'pedido_id': pedidoId,
+            'nome_item': item['nome'],
+            'quantidade': item['quantidade'],
+            'preco_unitario': item['preco'] ?? (item['total'] / item['quantidade']),
+            'subtotal': item['total'],
+            'observacoes': item['observacao'] ?? '',
+            'tamanho': _tamanhoSelecionado,
+            'sabores': item['descricao'] ?? '',
+          };
+        }).toList();
+
+        await supabase.from('pedido_itens').insert(itensData);
+        print('✅ Itens do pedido salvos com sucesso');
+      } catch (e) {
+        print('⚠️ Aviso: Itens não puderam ser salvos - tabela pedido_itens pode não existir: $e');
+        // Continuar mesmo se não conseguir salvar os itens
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Fechar loading
+
+      // Mostrar sucesso e voltar para tela anterior
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_getMensagemSucesso()),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+
+      // Ir para tela de caixa para mostrar o pedido no fechamento
+      Navigator.of(context).pushReplacementNamed('/caixa');
+      
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Fechar loading
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao criar pedido: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   String _getMensagemSucesso() {

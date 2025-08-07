@@ -47,7 +47,7 @@ class _ProdutosScreenState extends State<ProdutosScreen>
     try {
       // Carregar todas as categorias do banco
       final todasCategoriasResponse = await supabase
-          .from('produtos_categoria')
+          .from('categorias')
           .select('*')
           .eq('ativo', true)
           .order('nome');
@@ -142,8 +142,8 @@ class _ProdutosScreenState extends State<ProdutosScreen>
     try {
       // Carregar todos os produtos com suas categorias (ativos e inativos)
       final produtosResponse = await supabase
-          .from('produtos_produto')
-          .select('*, produtos_categoria(id, nome)')
+          .from('produtos')
+          .select('*, categorias(id, nome)')
           .order('nome');
 
       List<Map<String, dynamic>> todosProdutos = List<Map<String, dynamic>>.from(produtosResponse);
@@ -152,7 +152,7 @@ class _ProdutosScreenState extends State<ProdutosScreen>
       if (const bool.fromEnvironment('dart.vm.product') == false) {
         final categoriasUnicas = <String>{};
         for (var produto in todosProdutos) {
-          final categoria = produto['produtos_categoria'];
+          final categoria = produto['categorias'];
           if (categoria != null && categoria['nome'] != null) {
             categoriasUnicas.add(categoria['nome'].toString());
           }
@@ -166,7 +166,7 @@ class _ProdutosScreenState extends State<ProdutosScreen>
         final produtosAntesFiltro = todosProdutos.length;
         
         todosProdutos = todosProdutos.where((produto) {
-          final produtoCategoria = produto['produtos_categoria'];
+          final produtoCategoria = produto['categorias'];
           if (produtoCategoria == null) return false;
           
           // Verificar por ID da categoria
@@ -657,20 +657,20 @@ class _AddProductDialogState extends State<_AddProductDialog> {
       
       // 1. Testar select simples
       final selectTest = await supabase
-          .from('produtos_categoria')
+          .from('categorias')
           .select('id, nome')
           .limit(1);
       debugPrint('Teste SELECT: $selectTest');
       
-      // 2. Testar estrutura da tabela produtos_produto
+      // 2. Testar estrutura da tabela produtos
       try {
         final tableTest = await supabase
-            .from('produtos_produto')
+            .from('produtos')
             .select('*')
             .limit(1);
-        debugPrint('Estrutura produtos_produto: $tableTest');
+        debugPrint('Estrutura produtos: $tableTest');
       } catch (e) {
-        debugPrint('Erro ao acessar produtos_produto: $e');
+        debugPrint('Erro ao acessar produtos: $e');
         
         // Tentar outras variações do nome da tabela
         try {
@@ -786,7 +786,7 @@ class _AddProductDialogState extends State<_AddProductDialog> {
       dynamic response;
       try {
         response = await supabase
-            .from('produtos_produto')
+            .from('produtos')
             .insert(productData)
             .select();
       } catch (insertError) {
@@ -802,7 +802,7 @@ class _AddProductDialogState extends State<_AddProductDialog> {
         };
         
         response = await supabase
-            .from('produtos_produto')
+            .from('produtos')
             .insert(simpleData)
             .select();
       }
@@ -881,7 +881,7 @@ class _AddProductDialogState extends State<_AddProductDialog> {
       
       // Tentar encontrar categoria existente
       final response = await supabase
-          .from('produtos_categoria')
+          .from('categorias')
           .select('id, nome')
           .eq('nome', nomeBanco)
           .maybeSingle();
@@ -904,7 +904,7 @@ class _AddProductDialogState extends State<_AddProductDialog> {
       };
       
       final newCategoryResponse = await supabase
-          .from('produtos_categoria')
+          .from('categorias')
           .insert(newCategoryData)
           .select('id, nome')
           .single();
@@ -966,8 +966,8 @@ class _ProdutoCardState extends State<_ProdutoCard> {
 
     try {
       final precosResponse = await supabase
-          .from('produtos_produtopreco')
-          .select('*, produtos_tamanho(nome)')
+          .from('produtos_precos')
+          .select('*, tamanhos(nome)')
           .eq('produto_id', widget.produto['id']);
 
       setState(() {
@@ -984,7 +984,7 @@ class _ProdutoCardState extends State<_ProdutoCard> {
   @override
   Widget build(BuildContext context) {
     final produto = widget.produto;
-    final categoria = produto['produtos_categoria'];
+    final categoria = produto['categorias'];
     
     return Card(
       elevation: 4,
@@ -1138,7 +1138,7 @@ class _ProdutoCardState extends State<_ProdutoCard> {
   }
 
   Widget _buildPriceSection(Map<String, dynamic> produto) {
-    final categoria = produto['produtos_categoria'];
+    final categoria = produto['categorias'];
     final categoriaNome = categoria?['nome'] ?? '';
     
     // Para pizzas, mostrar preços por tamanho
@@ -1189,7 +1189,7 @@ class _ProdutoCardState extends State<_ProdutoCard> {
   
   double? _getPriceForSize(String size) {
     final preco = precos.firstWhere(
-      (p) => p['produtos_tamanho']?['nome']?.toString().toUpperCase() == size,
+      (p) => p['tamanhos']?['nome']?.toString().toUpperCase() == size,
       orElse: () => <String, dynamic>{},
     );
     return preco['preco']?.toDouble();
@@ -1268,19 +1268,19 @@ class _ProdutoCardState extends State<_ProdutoCard> {
       if (size.isEmpty) {
         // Atualizar preço unitário
         await supabase
-            .from('produtos_produto')
+            .from('produtos')
             .update({'preco_unitario': newPrice})
             .eq('id', produto['id']);
       } else {
         // Atualizar preço por tamanho
         final precoItem = precos.firstWhere(
-          (p) => p['produtos_tamanho']?['nome']?.toString().toUpperCase() == size,
+          (p) => p['tamanhos']?['nome']?.toString().toUpperCase() == size,
           orElse: () => <String, dynamic>{},
         );
         
         if (precoItem.isNotEmpty) {
           await supabase
-              .from('produtos_produtopreco')
+              .from('produtos_precos')
               .update({'preco': newPrice})
               .eq('id', precoItem['id']);
         }
@@ -1309,7 +1309,7 @@ class _ProdutoCardState extends State<_ProdutoCard> {
   Future<void> _toggleProductStatus(Map<String, dynamic> produto, bool newStatus) async {
     try {
       await supabase
-          .from('produtos_produto')
+          .from('produtos')
           .update({'ativo': newStatus})
           .eq('id', produto['id']);
       
@@ -1429,7 +1429,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
   Future<void> _loadCategorias() async {
     try {
       final response = await supabase
-          .from('produtos_categoria')
+          .from('categorias')
           .select('id, nome')
           .eq('ativo', true)
           .order('nome');
@@ -1445,8 +1445,8 @@ class _EditProductDialogState extends State<_EditProductDialog> {
   Future<void> _loadPrecos() async {
     try {
       final response = await supabase
-          .from('produtos_produtopreco')
-          .select('*, produtos_tamanho(id, nome)')
+          .from('produtos_precos')
+          .select('*, tamanhos(id, nome)')
           .eq('produto_id', widget.produto['id']);
       
       setState(() {
@@ -1561,7 +1561,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                   ),
                   const SizedBox(height: 8),
                   ..._precos.map((preco) {
-                    final tamanho = preco['produtos_tamanho'];
+                    final tamanho = preco['tamanhos'];
                     return Card(
                       child: ListTile(
                         title: Text(tamanho['nome'] ?? 'Tamanho'),
@@ -1604,7 +1604,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Editar Preço - ${preco['produtos_tamanho']['nome']}'),
+        title: Text('Editar Preço - ${preco['tamanhos']['nome']}'),
         content: TextFormField(
           controller: controller,
           decoration: const InputDecoration(
@@ -1639,7 +1639,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
   Future<void> _updatePrice(int precoId, double novoPreco) async {
     try {
       await supabase
-          .from('produtos_produtopreco')
+          .from('produtos_precos')
           .update({'preco': novoPreco, 'preco_promocional': novoPreco})
           .eq('id', precoId);
       
@@ -1667,7 +1667,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
       };
       
       await supabase
-          .from('produtos_produto')
+          .from('produtos')
           .update(dados)
           .eq('id', widget.produto['id']);
       

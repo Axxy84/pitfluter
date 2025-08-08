@@ -31,7 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Map<String, double> vendasPorCategoria = {'Pizza': 0, 'Bebidas': 0, 'Sobremesas': 0};
   List<double> vendasUltimos7Dias = [];
 
-  final List<String> periods = ['Hoje', 'Semana', 'Mês'];
+  final List<String> periods = ['Hoje', 'Semana', 'Mês', 'Todos'];
 
   @override
   void initState() {
@@ -64,26 +64,45 @@ class _DashboardScreenState extends State<DashboardScreen>
       DateTime inicio;
       
       // Determinar período baseado na seleção
+      List<Map<String, dynamic>> response;
+      
       switch (selectedPeriod) {
         case 'Hoje':
-          inicio = DateTime(hoje.year, hoje.month, hoje.day);
+          // Pegar últimas 24 horas ao invés de meia-noite
+          inicio = hoje.subtract(const Duration(hours: 24));
+          response = await supabase
+              .from('pedidos')
+              .select()
+              .gte('created_at', inicio.toIso8601String());
           break;
         case 'Semana':
           inicio = hoje.subtract(const Duration(days: 7));
+          response = await supabase
+              .from('pedidos')
+              .select()
+              .gte('created_at', inicio.toIso8601String());
           break;
         case 'Mês':
-          inicio = DateTime(hoje.year, hoje.month - 1, hoje.day);
+          inicio = hoje.subtract(const Duration(days: 30));
+          response = await supabase
+              .from('pedidos')
+              .select()
+              .gte('created_at', inicio.toIso8601String());
+          break;
+        case 'Todos':
+          // Buscar todos os pedidos
+          response = await supabase
+              .from('pedidos')
+              .select()
+              .order('created_at', ascending: false);
           break;
         default:
-          inicio = DateTime(hoje.year, hoje.month, hoje.day);
+          inicio = hoje.subtract(const Duration(hours: 24));
+          response = await supabase
+              .from('pedidos')
+              .select()
+              .gte('created_at', inicio.toIso8601String());
       }
-      
-      // Buscando pedidos do período
-      
-      final response = await supabase
-          .from('pedidos')
-          .select()
-          .gte('created_at', inicio.toIso8601String());
       
       // Processando resposta do Supabase
       

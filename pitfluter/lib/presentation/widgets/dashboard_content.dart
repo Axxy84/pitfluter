@@ -84,7 +84,7 @@ class _DashboardContentState extends State<DashboardContent>
           .gte('created_at', startDate.toIso8601String())
           .lt('created_at', endOfDay.toIso8601String());
 
-      final pedidos = List<Map<String, dynamic>>.from(pedidosResponse ?? []);
+      final pedidos = List<Map<String, dynamic>>.from(pedidosResponse);
       
       // 2. Calcular métricas
       totalPedidosHoje = pedidos.length;
@@ -108,7 +108,7 @@ class _DashboardContentState extends State<DashboardContent>
           .order('created_at', ascending: false)
           .limit(5);
       
-      pedidosRecentes = List<Map<String, dynamic>>.from(recentesResponse ?? []);
+      pedidosRecentes = List<Map<String, dynamic>>.from(recentesResponse);
       
       // 5. Produtos mais vendidos (se a tabela pedido_itens existir)
       try {
@@ -117,7 +117,7 @@ class _DashboardContentState extends State<DashboardContent>
             .select('nome_item, quantidade')
             .gte('created_at', startDate.toIso8601String());
         
-        final itens = List<Map<String, dynamic>>.from(itensResponse ?? []);
+        final itens = List<Map<String, dynamic>>.from(itensResponse);
         
         // Agrupar por produto
         final produtosMap = <String, int>{};
@@ -141,7 +141,7 @@ class _DashboardContentState extends State<DashboardContent>
       }
       
     } catch (e) {
-      print('Erro ao carregar dados do dashboard: $e');
+      // Erro ao carregar dados do dashboard
     }
 
     setState(() {

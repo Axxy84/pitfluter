@@ -58,7 +58,7 @@ class ImpressaoService {
     } catch (e) {
       // Log error (use logging framework in production)
       // ignore: avoid_print
-      print('Erro ao imprimir comanda: $e');
+      // Erro ao imprimir comanda
       return false;
     }
   }
@@ -101,7 +101,7 @@ class ImpressaoService {
     } catch (e) {
       // Log error (use logging framework in production)
       // ignore: avoid_print
-      print('Erro ao compartilhar comanda: $e');
+      // Erro ao compartilhar comanda
       return false;
     }
   }

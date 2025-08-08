@@ -1438,7 +1438,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
         _categorias = List<Map<String, dynamic>>.from(response);
       });
     } catch (e) {
-      print('Erro ao carregar categorias: $e');
+      // Erro ao carregar categorias
     }
   }
   
@@ -1453,7 +1453,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
         _precos = List<Map<String, dynamic>>.from(response);
       });
     } catch (e) {
-      print('Erro ao carregar preços: $e');
+      // Erro ao carregar preços
     }
   }
   

@@ -698,7 +698,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
     for (final movimento in movimentacoes) {
       if (movimento.tipo == TipoMovimento.venda) {
         // Tentar identificar o tipo pela descrição ou buscar no banco
-        final descricao = movimento.descricao?.toLowerCase() ?? '';
+        final descricao = movimento.descricao.toLowerCase();
         
         // Por enquanto vamos usar a descrição, mas idealmente buscaríamos o tipo real
         if (descricao.contains('balcão') || descricao.contains('balcao')) {

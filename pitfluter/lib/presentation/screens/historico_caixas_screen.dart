@@ -147,9 +147,9 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: cor.withOpacity(0.1),
+        color: cor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cor.withOpacity(0.3)),
+        border: Border.all(color: cor.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,7 +163,7 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
                   titulo,
                   style: TextStyle(
                     fontSize: 10,
-                    color: cor.withOpacity(0.8),
+                    color: cor.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w600,
                   ),
                 ),

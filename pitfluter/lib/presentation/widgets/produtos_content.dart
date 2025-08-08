@@ -64,8 +64,7 @@ class _ProdutosContentState extends State<ProdutosContent>
       
       // Debug: ver estrutura dos produtos
       if (produtos.isNotEmpty) {
-        print('Exemplo de produto: ${produtos.first}');
-        print('Campos do produto: ${produtos.first.keys.toList()}');
+        // Debug: estrutura dos produtos
       }
       
       // Carregar categorias
@@ -96,8 +95,7 @@ class _ProdutosContentState extends State<ProdutosContent>
         }
       }
       
-      print('Total de categorias: ${categorias.length}');
-      print('Categorias: ${categorias.map((c) => c['nome']).toList()}');
+      // Categorias carregadas
       
       // Inicializar ou atualizar TabController
       if (_tabController == null) {
@@ -146,8 +144,7 @@ class _ProdutosContentState extends State<ProdutosContent>
         isLoading = false;
       });
     } catch (e) {
-      print('Erro ao carregar dados: $e');
-      print('Tipo do erro: ${e.runtimeType}');
+      // Erro ao carregar dados
       setState(() {
         error = e.toString();
         isLoading = false;

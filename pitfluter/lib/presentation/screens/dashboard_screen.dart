@@ -58,6 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _carregarDadosReais() async {
+    // Carregando dados do dashboard
     try {
       final hoje = DateTime.now();
       DateTime inicio;
@@ -77,10 +78,14 @@ class _DashboardScreenState extends State<DashboardScreen>
           inicio = DateTime(hoje.year, hoje.month, hoje.day);
       }
       
+      // Buscando pedidos do período
+      
       final response = await supabase
           .from('pedidos')
           .select()
           .gte('created_at', inicio.toIso8601String());
+      
+      // Processando resposta do Supabase
       
       // Resetar contadores
       totalVendasHoje = 0.0;
@@ -161,11 +166,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       
       pedidosRecentes = List<Map<String, dynamic>>.from(recentesResponse);
       
+      // Dados processados com sucesso
+      
       if (mounted) {
         setState(() {});
       }
     } catch (e) {
-      // Erro silencioso - em produção usar logging framework
+      // Erro ao carregar dados - usar logging em produção
     }
   }
 

@@ -254,19 +254,17 @@ class _DashboardScreenState extends State<DashboardScreen>
                   'observacoes': 'Pedido de teste',
                 });
                 
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Pedido #$proximoNumero criado!')),
-                  );
-                  
-                  _carregarDadosReais();
-                }
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Pedido #$proximoNumero criado!')),
+                );
+                
+                _carregarDadosReais();
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Erro: $e')),
-                  );
-                }
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Erro: $e')),
+                );
               }
             },
             backgroundColor: Colors.orange,

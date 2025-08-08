@@ -1624,7 +1624,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
               final novoPreco = double.tryParse(controller.text.replaceAll(',', '.'));
               if (novoPreco != null) {
                 await _updatePrice(preco['id'], novoPreco);
-                if (!mounted) return;
+                if (!context.mounted) return;
                 Navigator.pop(context);
                 _loadPrecos();
               }
@@ -1643,13 +1643,17 @@ class _EditProductDialogState extends State<_EditProductDialog> {
           .update({'preco': novoPreco, 'preco_promocional': novoPreco})
           .eq('id', precoId);
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Preço atualizado com sucesso!')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Preço atualizado com sucesso!')),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao atualizar preço: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao atualizar preço: $e')),
+        );
+      }
     }
   }
   
@@ -1671,17 +1675,20 @@ class _EditProductDialogState extends State<_EditProductDialog> {
           .update(dados)
           .eq('id', widget.produto['id']);
       
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Produto atualizado com sucesso!')),
       );
       
       widget.onProductUpdated();
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
       
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao atualizar produto: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao atualizar produto: $e')),
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }

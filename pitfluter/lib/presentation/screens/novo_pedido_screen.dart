@@ -2111,10 +2111,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         pedidoData['troco'] = trocoCalculado;
       }
 
-      print('📦 Dados do pedido a serem salvos:');
-      pedidoData.forEach((key, value) {
-        print('   $key: $value');
-      });
+      // Dados do pedido preparados para salvar
 
       // Inserir pedido
       final pedidoResponse = await supabase
@@ -2123,11 +2120,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           .select()
           .single();
 
-      print('✅ Pedido salvo com sucesso!');
-      print('   ID: ${pedidoResponse['id']}');
-      print('   Número: ${pedidoResponse['numero']}');
-      print('   Total: R\$ ${pedidoResponse['total']}');
-      print('   Created at: ${pedidoResponse['created_at']}');
+      // Pedido salvo com sucesso
 
       final pedidoId = pedidoResponse['id'];
 
@@ -2168,10 +2161,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       // Ir para tela de caixa para mostrar o pedido no fechamento
       Navigator.of(context).pushReplacementNamed('/caixa');
       
-    } catch (e, stackTrace) {
-      print('❌ Erro ao criar pedido:');
-      print('   Erro: $e');
-      print('   Stack: $stackTrace');
+    } catch (e) {
+      // Erro ao criar pedido
       
       if (!mounted) return;
       Navigator.of(context).pop(); // Fechar loading

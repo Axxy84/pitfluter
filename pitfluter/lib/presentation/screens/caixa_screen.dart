@@ -35,8 +35,6 @@ class _CaixaScreenState extends State<CaixaScreen> {
   Future<void> _verificarEstadoCaixa() async {
     if (!mounted) return;
     
-    print('🔍 [_verificarEstadoCaixa] Verificando estado do caixa...');
-    
     setState(() {
       _carregando = true;
     });
@@ -44,10 +42,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
     try {
       final estadoCaixa = await _caixaService.verificarEstadoCaixa();
       
-      print('📊 Estado do caixa:');
-      print('   Aberto: ${estadoCaixa.aberto}');
-      print('   ID: ${estadoCaixa.id}');
-      print('   Data abertura: ${estadoCaixa.dataAbertura}');
+      // Estado do caixa verificado
       
       if (!mounted) return;
       
@@ -56,7 +51,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
         _carregando = false;
       });
     } catch (e) {
-      print('❌ Erro ao verificar estado: $e');
+      // Erro ao verificar estado
       if (!mounted) return;
       
       setState(() {
@@ -70,14 +65,13 @@ class _CaixaScreenState extends State<CaixaScreen> {
   }
 
   Future<void> _carregarDados() async {
-    print('🔄 [_carregarDados] Iniciando...');
-    print('   Estado _caixaAberto: $_caixaAberto');
+    // Carregando dados do caixa
     
     // Verificar novamente o estado antes de prosseguir
     await _verificarEstadoCaixa();
     
     if (!_caixaAberto) {
-      print('⚠️ Caixa não está aberto - É necessário abrir o caixa primeiro!');
+      // Caixa não está aberto
       setState(() {
         caixaAtual = null;
         movimentacoes = [];
@@ -97,14 +91,12 @@ class _CaixaScreenState extends State<CaixaScreen> {
     }
     
     try {
-      print('📊 Obtendo dados do caixa atual...');
+      // Obtendo dados do caixa
       final dadosCaixa = await _caixaService.obterDadosCaixaAtual();
       final estado = dadosCaixa['estado'] as EstadoCaixa;
       final resumo = dadosCaixa['resumo'] as ResumoCaixa;
       
-      print('📈 Resumo do caixa:');
-      print('   Total vendas: R\$ ${resumo.totalVendas}');
-      print('   Quantidade vendas: ${resumo.quantidadeVendas}');
+      // Resumo do caixa carregado
       
       // Buscar movimentações reais do período
       final movimentacoesReais = await _buscarMovimentacoesCaixa(estado.id!, estado.dataAbertura!);
@@ -143,9 +135,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
   }
   
   Future<List<MovimentoCaixa>> _buscarMovimentacoesCaixa(int caixaId, String dataAbertura) async {
-    print('🔍 [_buscarMovimentacoesCaixa] Iniciando busca...');
-    print('   CaixaID: $caixaId');
-    print('   Data Abertura: $dataAbertura');
+    // Buscando movimentações do caixa
     final movimentacoes = <MovimentoCaixa>[];
     
     // Adicionar abertura de caixa
@@ -164,7 +154,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
     );
     
     try {
-      print('🔍 [CaixaScreen] Buscando vendas a partir de: $dataAbertura');
+      // Buscando vendas do período
       
       // Buscar vendas do período
       final supabase = Supabase.instance.client;
@@ -174,10 +164,9 @@ class _CaixaScreenState extends State<CaixaScreen> {
           .gte('created_at', dataAbertura)
           .order('created_at');
       
-      print('📊 [CaixaScreen] Vendas encontradas: ${vendas.length}');
+      // Processando vendas encontradas
       
       for (final venda in vendas) {
-        print('   Venda: #${venda['numero']} - R\$ ${venda['total']} - ${venda['forma_pagamento']} - Tipo: ${venda['tipo']}');
         
         // Adicionar o tipo de pedido na descrição para facilitar a contagem
         final tipoPedido = venda['tipo'] ?? 'balcao';
@@ -204,7 +193,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
         );
       }
     } catch (e) {
-      print('❌ [CaixaScreen] Erro ao buscar vendas: $e');
+      // Erro ao buscar vendas
       // Tabela pedidos não existe - isso é normal
       // O caixa funcionará apenas com a movimentação de abertura
     }

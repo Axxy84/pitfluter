@@ -37,29 +37,18 @@ class CaixaService {
 
   Future<EstadoCaixa> verificarEstadoCaixa() async {
     try {
-      print('🔍 [CaixaService] Verificando estado do caixa...');
-      
       final response = await _supabase
           .from('caixa')
           .select()
           .order('data_abertura', ascending: false)
           .limit(1);
       
-      print('📊 [CaixaService] Resposta do banco: ${response.length} registros');
-      
       if (response.isEmpty) {
-        print('   ⚠️ Nenhum caixa encontrado no banco');
         return EstadoCaixa(aberto: false);
       }
       
       final ultimoCaixa = response.first;
       final bool aberto = ultimoCaixa['data_fechamento'] == null;
-      
-      print('   📦 Último caixa:');
-      print('      ID: ${ultimoCaixa['id']}');
-      print('      Data abertura: ${ultimoCaixa['data_abertura']}');
-      print('      Data fechamento: ${ultimoCaixa['data_fechamento']}');
-      print('      Está aberto: $aberto');
       
       return EstadoCaixa(
         aberto: aberto,
@@ -69,7 +58,6 @@ class CaixaService {
       );
       
     } catch (e) {
-      print('❌ [CaixaService] Erro: $e');
       throw Exception('Erro ao verificar estado do caixa: $e');
     }
   }
@@ -132,19 +120,13 @@ class CaixaService {
     int quantidadeVendas = 0;
     
     try {
-      print('🔍 Buscando pedidos a partir de: ${estado.dataAbertura}');
-      
       // Buscar vendas do período do caixa aberto
       final pedidos = await _supabase
           .from('pedidos')
           .select()
           .gte('created_at', estado.dataAbertura!);
       
-      print('📊 Total de pedidos encontrados: ${pedidos.length}');
-      
       for (final pedido in pedidos) {
-        print('   Pedido #${pedido['numero']}: R\$ ${pedido['total']} - ${pedido['forma_pagamento']}');
-        
         final total = (pedido['total'] ?? 0).toDouble();
         totalVendas += total;
         
@@ -162,9 +144,7 @@ class CaixaService {
       }
       
       quantidadeVendas = pedidos.length;
-      print('💰 Total de vendas: R\$ $totalVendas');
     } catch (e) {
-      print('❌ Erro ao buscar pedidos: $e');
       // Se não conseguir buscar pedidos (tabela não existe, etc.), continua com valores zerados
       // Não foi possível buscar pedidos (tabela pode não existir), continua com valores zerados
     }

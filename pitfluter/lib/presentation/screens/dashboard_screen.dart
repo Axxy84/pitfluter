@@ -59,7 +59,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Future<void> _carregarDadosReais() async {
     try {
-      print('🔄 [Dashboard] Carregando dados...');
       final hoje = DateTime.now();
       DateTime inicio;
       
@@ -78,15 +77,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           inicio = DateTime(hoje.year, hoje.month, hoje.day);
       }
       
-      print('   📅 Período: $selectedPeriod');
-      print('   📅 Buscando a partir de: ${inicio.toIso8601String()}');
-      
       final response = await supabase
           .from('pedidos')
           .select()
           .gte('created_at', inicio.toIso8601String());
-      
-      print('   ✅ Pedidos encontrados: ${response.length}');
       
       // Resetar contadores
       totalVendasHoje = 0.0;
@@ -95,13 +89,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       formasPagamento = {'Dinheiro': 0, 'PIX': 0, 'Cartão': 0};
       
       // Processar pedidos
-      print('   💰 Processando ${response.length} pedidos...');
       for (final pedido in response) {
         final valor = (pedido['total'] ?? 0).toDouble();
         totalVendasHoje += valor;
         quantidadePedidosHoje++;
-        
-        print('      Pedido #${pedido['numero']}: R\$ $valor - ${pedido['tipo']} - ${pedido['forma_pagamento']}');
         
         // Contar por tipo
         final tipo = pedido['tipo'] ?? 'balcao';
@@ -130,10 +121,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       } else {
         ticketMedio = 0;
       }
-      
-      print('   📊 Total vendas: R\$ $totalVendasHoje');
-      print('   📊 Quantidade pedidos: $quantidadePedidosHoje');
-      print('   📊 Ticket médio: R\$ $ticketMedio');
       
       // Simular dados de categoria (por enquanto distribui proporcionalmente)
       // Em produção, você teria uma tabela de itens de pedido com categorias
@@ -177,11 +164,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (mounted) {
         setState(() {});
       }
-      
-      print('✅ [Dashboard] Dados carregados com sucesso!');
     } catch (e) {
-      print('❌ [Dashboard] Erro ao carregar dados: $e');
-      print('   Stack trace: ${StackTrace.current}');
+      // Erro silencioso - em produção usar logging framework
     }
   }
 

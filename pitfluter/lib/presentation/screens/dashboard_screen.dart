@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../../services/caixa_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -18,6 +19,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final CaixaService _caixaService = CaixaService();
+  bool _caixaAberto = false;
   
   final supabase = Supabase.instance.client;
   
@@ -49,6 +52,26 @@ class _DashboardScreenState extends State<DashboardScreen>
     ));
     _animationController.forward();
     _carregarDadosReais();
+    _verificarCaixa();
+  }
+  
+  Future<void> _verificarCaixa() async {
+    try {
+      final estado = await _caixaService.verificarEstadoCaixa();
+      setState(() {
+        _caixaAberto = estado.aberto;
+      });
+      
+      // Se o caixa estiver fechado, mostrar dialog para abrir
+      if (!estado.aberto && mounted) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          _mostrarDialogAbrirCaixa();
+        }
+      }
+    } catch (e) {
+      // Erro ao verificar caixa
+    }
   }
 
   @override
@@ -330,6 +353,33 @@ class _DashboardScreenState extends State<DashboardScreen>
                 iconSize: 28,
               ),
               const Spacer(),
+              // Tag de status do caixa
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _caixaAberto ? Colors.green : Colors.orange,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _caixaAberto ? Icons.lock_open : Icons.lock,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _caixaAberto ? 'Caixa Aberto' : 'Caixa Livre',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -929,6 +979,170 @@ class _DashboardScreenState extends State<DashboardScreen>
       const SnackBar(
         content: Text('Funcionalidade em desenvolvimento!'),
         duration: Duration(seconds: 2),
+      ),
+    );
+  }
+  
+  void _mostrarDialogAbrirCaixa() {
+    final valorController = TextEditingController();
+    final observacoesController = TextEditingController();
+    final nomeUsuarioController = TextEditingController();
+    
+    final operadoresComuns = [
+      'João',
+      'Maria', 
+      'Pedro',
+      'Ana',
+      'Carlos',
+      'Juliana',
+    ];
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.lock_open, color: Colors.green),
+            const SizedBox(width: 8),
+            const Text('Abrir Caixa'),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'LIVRE',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'O caixa precisa ser aberto para registrar vendas',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nomeUsuarioController,
+                decoration: const InputDecoration(
+                  labelText: 'Nome do Operador',
+                  prefixIcon: Icon(Icons.person),
+                  hintText: 'Digite o nome do operador',
+                ),
+                autofocus: true,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: operadoresComuns.map((nome) {
+                  return ActionChip(
+                    label: Text(nome),
+                    onPressed: () {
+                      nomeUsuarioController.text = nome;
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: valorController,
+                decoration: const InputDecoration(
+                  labelText: 'Valor Inicial (R\$)',
+                  prefixIcon: Icon(Icons.attach_money),
+                  hintText: '0,00',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: observacoesController,
+                decoration: const InputDecoration(
+                  labelText: 'Observações (opcional)',
+                  prefixIcon: Icon(Icons.notes),
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Pode navegar para tela de caixa se quiser
+              Navigator.pushNamed(context, '/caixa');
+            },
+            child: const Text('Abrir Depois'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final nomeUsuario = nomeUsuarioController.text.trim();
+              final valor = double.tryParse(valorController.text.replaceAll(',', '.')) ?? 0;
+              final observacoes = observacoesController.text;
+              
+              if (nomeUsuario.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Por favor, informe o nome do operador'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                return;
+              }
+              
+              if (valor < 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Valor inicial não pode ser negativo'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+                return;
+              }
+              
+              Navigator.of(context).pop();
+              
+              try {
+                await _caixaService.abrirCaixa(valor, observacoes, nomeUsuario);
+                await _verificarCaixa();
+                
+                if (!mounted) return;
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Caixa aberto com sucesso!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                if (!mounted) return;
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Erro ao abrir caixa: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+            ),
+            child: const Text('Abrir Agora'),
+          ),
+        ],
       ),
     );
   }

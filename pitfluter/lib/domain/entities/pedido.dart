@@ -16,7 +16,6 @@ class Pedido extends Equatable {
   final double desconto;
   final double total;
   final String formaPagamento;
-  final String status; // Simplificado para string
   final TipoPedido tipo;
   final String? observacoes;
   final DateTime dataHoraCriacao;
@@ -34,7 +33,6 @@ class Pedido extends Equatable {
     required this.desconto,
     required this.total,
     required this.formaPagamento,
-    required this.status,
     required this.tipo,
     this.observacoes,
     required this.dataHoraCriacao,
@@ -59,7 +57,6 @@ class Pedido extends Equatable {
     double? desconto,
     double? total,
     String? formaPagamento,
-    String? status,
     TipoPedido? tipo,
     String? observacoes,
     DateTime? dataHoraCriacao,
@@ -77,7 +74,6 @@ class Pedido extends Equatable {
       desconto: desconto ?? this.desconto,
       total: total ?? this.total,
       formaPagamento: formaPagamento ?? this.formaPagamento,
-      status: status ?? this.status,
       tipo: tipo ?? this.tipo,
       observacoes: observacoes ?? this.observacoes,
       dataHoraCriacao: dataHoraCriacao ?? this.dataHoraCriacao,
@@ -98,7 +94,6 @@ class Pedido extends Equatable {
         desconto,
         total,
         formaPagamento,
-        status,
         tipo,
         observacoes,
         dataHoraCriacao,

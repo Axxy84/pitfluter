@@ -26,11 +26,16 @@ class _CaixaScreenState extends State<CaixaScreen> {
   void initState() {
     super.initState();
     _verificarEstadoCaixa();
-    _carregarDados();
+    // Agendar _carregarDados para depois do build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _carregarDados();
+    });
   }
   
   Future<void> _verificarEstadoCaixa() async {
     if (!mounted) return;
+    
+    print('🔍 [_verificarEstadoCaixa] Verificando estado do caixa...');
     
     setState(() {
       _carregando = true;
@@ -39,6 +44,11 @@ class _CaixaScreenState extends State<CaixaScreen> {
     try {
       final estadoCaixa = await _caixaService.verificarEstadoCaixa();
       
+      print('📊 Estado do caixa:');
+      print('   Aberto: ${estadoCaixa.aberto}');
+      print('   ID: ${estadoCaixa.id}');
+      print('   Data abertura: ${estadoCaixa.dataAbertura}');
+      
       if (!mounted) return;
       
       setState(() {
@@ -46,6 +56,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
         _carregando = false;
       });
     } catch (e) {
+      print('❌ Erro ao verificar estado: $e');
       if (!mounted) return;
       
       setState(() {
@@ -59,18 +70,41 @@ class _CaixaScreenState extends State<CaixaScreen> {
   }
 
   Future<void> _carregarDados() async {
+    print('🔄 [_carregarDados] Iniciando...');
+    print('   Estado _caixaAberto: $_caixaAberto');
+    
+    // Verificar novamente o estado antes de prosseguir
+    await _verificarEstadoCaixa();
+    
     if (!_caixaAberto) {
+      print('⚠️ Caixa não está aberto - É necessário abrir o caixa primeiro!');
       setState(() {
         caixaAtual = null;
         movimentacoes = [];
       });
+      
+      // Mostrar mensagem clara ao usuário
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Você precisa ABRIR O CAIXA primeiro para registrar vendas!'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
       return;
     }
     
     try {
+      print('📊 Obtendo dados do caixa atual...');
       final dadosCaixa = await _caixaService.obterDadosCaixaAtual();
       final estado = dadosCaixa['estado'] as EstadoCaixa;
       final resumo = dadosCaixa['resumo'] as ResumoCaixa;
+      
+      print('📈 Resumo do caixa:');
+      print('   Total vendas: R\$ ${resumo.totalVendas}');
+      print('   Quantidade vendas: ${resumo.quantidadeVendas}');
       
       // Buscar movimentações reais do período
       final movimentacoesReais = await _buscarMovimentacoesCaixa(estado.id!, estado.dataAbertura!);
@@ -109,6 +143,9 @@ class _CaixaScreenState extends State<CaixaScreen> {
   }
   
   Future<List<MovimentoCaixa>> _buscarMovimentacoesCaixa(int caixaId, String dataAbertura) async {
+    print('🔍 [_buscarMovimentacoesCaixa] Iniciando busca...');
+    print('   CaixaID: $caixaId');
+    print('   Data Abertura: $dataAbertura');
     final movimentacoes = <MovimentoCaixa>[];
     
     // Adicionar abertura de caixa
@@ -127,16 +164,20 @@ class _CaixaScreenState extends State<CaixaScreen> {
     );
     
     try {
+      print('🔍 [CaixaScreen] Buscando vendas a partir de: $dataAbertura');
+      
       // Buscar vendas do período
       final supabase = Supabase.instance.client;
       final vendas = await supabase
           .from('pedidos')
           .select()
-          .gte('data_pedido', dataAbertura)
-          .neq('status', 'Cancelado')
-          .order('data_pedido');
+          .gte('created_at', dataAbertura)
+          .order('created_at');
+      
+      print('📊 [CaixaScreen] Vendas encontradas: ${vendas.length}');
       
       for (final venda in vendas) {
+        print('   Venda: #${venda['numero']} - R\$ ${venda['total']} - ${venda['forma_pagamento']}');
         movimentacoes.add(
           MovimentoCaixa(
             id: venda['id'],
@@ -144,13 +185,14 @@ class _CaixaScreenState extends State<CaixaScreen> {
             tipo: TipoMovimento.venda,
             valor: (venda['total'] ?? 0).toDouble(),
             formaPagamento: _parseFormaPagamento(venda['forma_pagamento']),
-            descricao: 'Pedido #${venda['id']}',
-            dataHora: DateTime.parse(venda['data_pedido']),
-            dataCadastro: venda['data_pedido'],
+            descricao: 'Pedido #${venda['numero'] ?? venda['id']}',
+            dataHora: DateTime.parse(venda['created_at']),
+            dataCadastro: venda['created_at'],
           ),
         );
       }
     } catch (e) {
+      print('❌ [CaixaScreen] Erro ao buscar vendas: $e');
       // Tabela pedidos não existe - isso é normal
       // O caixa funcionará apenas com a movimentação de abertura
     }

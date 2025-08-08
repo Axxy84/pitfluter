@@ -32,6 +32,11 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   int _quantidade = 1;
   int _mesaSelecionada = 1;
   
+  // Variáveis para forma de pagamento
+  String _formaPagamento = 'dinheiro';
+  final TextEditingController _valorPagoController = TextEditingController();
+  double _troco = 0.0;
+  
   final List<Map<String, dynamic>> _carrinho = [];
   double _subtotal = 0.0;
   double _taxaEntregaEditavel = 2.0;
@@ -1723,6 +1728,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         border: Border(top: BorderSide(color: Colors.grey, width: 0.5)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1790,6 +1796,84 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          
+          // Forma de Pagamento
+          const Text(
+            'Forma de Pagamento:',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          
+          // Opções de pagamento em linha
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildOpcaoPagamento('dinheiro', Icons.money, 'Dinheiro'),
+                const SizedBox(width: 8),
+                _buildOpcaoPagamento('pix', Icons.qr_code, 'PIX'),
+                const SizedBox(width: 8),
+                _buildOpcaoPagamento('cartao', Icons.credit_card, 'Cartão'),
+              ],
+            ),
+          ),
+          
+          // Campo de valor pago e troco (apenas para dinheiro)
+          if (_formaPagamento == 'dinheiro') ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _valorPagoController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Valor Recebido',
+                      prefixText: 'R\$ ',
+                      isDense: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                    ),
+                    onChanged: (value) {
+                      _calcularTroco(total);
+                    },
+                  ),
+                ),
+                if (_troco > 0) ...[
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Troco',
+                          style: TextStyle(fontSize: 12, color: Colors.green),
+                        ),
+                        Text(
+                          'R\$ ${_troco.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+          
           const SizedBox(height: 16),
           Row(
             children: [
@@ -1808,7 +1892,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: ElevatedButton(
+                child: ElevatedButton.icon(
                   onPressed: _carrinho.isNotEmpty && _validarPedido()
                       ? () {
                           HapticFeedback.lightImpact();
@@ -1819,7 +1903,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                     backgroundColor: Colors.red,
                     foregroundColor: Colors.white,
                   ),
-                  child: const Text('Salvar Pedido'),
+                  icon: const Icon(Icons.payment, size: 18),
+                  label: const Text('Pagar e Salvar'),
                 ),
               ),
             ],
@@ -1842,6 +1927,59 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     }
   }
 
+  void _calcularTroco(double total) {
+    final valorText = _valorPagoController.text
+        .replaceAll('R\$', '')
+        .replaceAll('.', '')
+        .replaceAll(',', '.')
+        .trim();
+    
+    if (valorText.isEmpty) {
+      setState(() => _troco = 0.0);
+      return;
+    }
+    
+    try {
+      final valorPago = double.parse(valorText);
+      setState(() {
+        _troco = valorPago > total ? valorPago - total : 0.0;
+      });
+    } catch (e) {
+      setState(() => _troco = 0.0);
+    }
+  }
+  
+  Widget _buildOpcaoPagamento(String valor, IconData icone, String label) {
+    final isSelected = _formaPagamento == valor;
+    
+    return ChoiceChip(
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
+          setState(() {
+            _formaPagamento = valor;
+            if (valor != 'dinheiro') {
+              _valorPagoController.clear();
+              _troco = 0.0;
+            }
+          });
+        }
+      },
+      avatar: Icon(
+        icone,
+        size: 18,
+        color: isSelected ? Colors.white : Colors.grey[700],
+      ),
+      label: Text(label),
+      selectedColor: Colors.red,
+      backgroundColor: Colors.grey[200],
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : Colors.grey[700],
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      ),
+    );
+  }
+
   Future<void> _salvarPedido() async {
     if (_carrinho.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1852,7 +1990,40 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       );
       return;
     }
+    
+    // Validar pagamento em dinheiro
+    if (_formaPagamento == 'dinheiro' && _valorPagoController.text.isNotEmpty) {
+      final total = _subtotal + _taxaEntrega;
+      final valorText = _valorPagoController.text
+          .replaceAll('R\$', '')
+          .replaceAll('.', '')
+          .replaceAll(',', '.')
+          .trim();
+      
+      try {
+        final valorPago = double.parse(valorText);
+        if (valorPago < total) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Valor recebido insuficiente'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Valor inválido'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
 
+    if (!mounted) return;
+    
     // Mostrar loading
     showDialog(
       context: context,
@@ -1905,43 +2076,45 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
 
       final supabase = Supabase.instance.client;
 
-      // Preparar dados básicos do pedido compatíveis com estrutura existente
+      // Preparar forma de pagamento
+      String formaPagamentoTexto = _formaPagamento == 'dinheiro' ? 'Dinheiro' : 
+                                   _formaPagamento == 'pix' ? 'PIX' : 'Cartão';
+      
+      // Calcular valor pago e troco se for dinheiro
+      double? valorPago;
+      double? trocoCalculado;
+      if (_formaPagamento == 'dinheiro' && _valorPagoController.text.isNotEmpty) {
+        final valorText = _valorPagoController.text
+            .replaceAll('R\$', '')
+            .replaceAll('.', '')
+            .replaceAll(',', '.')
+            .trim();
+        valorPago = double.tryParse(valorText);
+        trocoCalculado = _troco;
+      }
+
+      // Preparar dados SIMPLIFICADOS do pedido (apenas campos essenciais)
       final pedidoData = <String, dynamic>{
         'numero': numeroPedido,
-        'subtotal': _subtotal,
+        'tipo': tipoPedidoDb,
         'total': _subtotal + (_tipoPedido == 'delivery' ? _taxaEntregaEditavel : 0.0),
-        'status': 'aberto', // Status simplificado
-        'data_hora_criacao': agora.toIso8601String(),
+        'forma_pagamento': formaPagamentoTexto,
+        'observacoes': observacoes.trim().isEmpty ? null : observacoes.trim(),
+        // Removido campo status que estava causando erro de constraint
       };
-
-      // Adicionar colunas opcionais apenas se existirem na tabela
-      try {
-        // Verificar estrutura da tabela primeiro
-        final estrutura = await supabase
-            .from('pedidos')
-            .select('*')
-            .limit(1)
-            .maybeSingle();
-
-        if (estrutura != null) {
-          // Adicionar colunas baseado na estrutura existente
-          final colunas = estrutura.keys.toSet();
-          
-          if (colunas.contains('cliente_id')) pedidoData['cliente_id'] = null;
-          if (colunas.contains('endereco_id')) pedidoData['endereco_id'] = null;
-          if (colunas.contains('mesa_id')) pedidoData['mesa_id'] = _tipoPedido == 'mesa' ? _mesaSelecionada : null;
-          if (colunas.contains('taxa_entrega')) pedidoData['taxa_entrega'] = _tipoPedido == 'delivery' ? _taxaEntregaEditavel : 0.0;
-          if (colunas.contains('desconto')) pedidoData['desconto'] = 0.0;
-          if (colunas.contains('forma_pagamento')) pedidoData['forma_pagamento'] = 'Dinheiro';
-          if (colunas.contains('tipo')) pedidoData['tipo'] = tipoPedidoDb;
-          if (colunas.contains('observacoes')) pedidoData['observacoes'] = observacoes.trim().isEmpty ? null : observacoes.trim();
-          if (colunas.contains('data_hora_atualizacao')) pedidoData['data_hora_atualizacao'] = agora.toIso8601String();
-          if (colunas.contains('nome_cliente')) pedidoData['nome_cliente'] = nomeCliente;
-          if (colunas.contains('telefone_cliente')) pedidoData['telefone_cliente'] = null;
-        }
-      } catch (e) {
-        print('Aviso: Não foi possível verificar estrutura da tabela: $e');
+      
+      // Adicionar campos opcionais se tiverem valor
+      if (valorPago != null) {
+        pedidoData['valor_pago'] = valorPago;
       }
+      if (trocoCalculado != null && trocoCalculado > 0) {
+        pedidoData['troco'] = trocoCalculado;
+      }
+
+      print('📦 Dados do pedido a serem salvos:');
+      pedidoData.forEach((key, value) {
+        print('   $key: $value');
+      });
 
       // Inserir pedido
       final pedidoResponse = await supabase
@@ -1949,6 +2122,12 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           .insert(pedidoData)
           .select()
           .single();
+
+      print('✅ Pedido salvo com sucesso!');
+      print('   ID: ${pedidoResponse['id']}');
+      print('   Número: ${pedidoResponse['numero']}');
+      print('   Total: R\$ ${pedidoResponse['total']}');
+      print('   Created at: ${pedidoResponse['created_at']}');
 
       final pedidoId = pedidoResponse['id'];
 
@@ -1968,9 +2147,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         }).toList();
 
         await supabase.from('pedido_itens').insert(itensData);
-        print('✅ Itens do pedido salvos com sucesso');
+        // Itens do pedido salvos com sucesso
       } catch (e) {
-        print('⚠️ Aviso: Itens não puderam ser salvos - tabela pedido_itens pode não existir: $e');
+        // Aviso: Itens não puderam ser salvos - tabela pedido_itens pode não existir
         // Continuar mesmo se não conseguir salvar os itens
       }
 
@@ -1989,15 +2168,39 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       // Ir para tela de caixa para mostrar o pedido no fechamento
       Navigator.of(context).pushReplacementNamed('/caixa');
       
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('❌ Erro ao criar pedido:');
+      print('   Erro: $e');
+      print('   Stack: $stackTrace');
+      
       if (!mounted) return;
       Navigator.of(context).pop(); // Fechar loading
       
+      // Mensagem de erro mais específica
+      String mensagemErro = 'Erro ao criar pedido';
+      if (e.toString().contains('duplicate')) {
+        mensagemErro = 'Número de pedido já existe';
+      } else if (e.toString().contains('null')) {
+        mensagemErro = 'Campos obrigatórios não preenchidos';
+      } else if (e.toString().contains('network')) {
+        mensagemErro = 'Erro de conexão com o servidor';
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao criar pedido: $e'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(mensagemErro),
+              Text(
+                'Detalhes: ${e.toString()}',
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
           backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 6),
         ),
       );
     }

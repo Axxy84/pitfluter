@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../widgets/dashboard_content.dart';
 import '../widgets/produtos_content.dart';
-import '../widgets/pedidos_content.dart';
 import '../screens/caixa_screen.dart';
 import '../screens/historico_caixas_screen.dart';
+import '../screens/lista_pedidos_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -252,7 +252,7 @@ class _PedidosContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const PedidosContent();
+    return const ListaPedidosScreen();
   }
 }
 

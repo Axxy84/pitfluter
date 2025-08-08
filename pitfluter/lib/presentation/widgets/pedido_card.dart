@@ -15,8 +15,8 @@ class PedidoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final statusColor = _getStatusColor(pedido.status);
-    final statusText = _getStatusText(pedido.status);
+    const statusColor = Colors.blue; // Cor padrão
+    const statusText = 'ATIVO'; // Status padrão
     final typeIcon = _getTypeIcon(pedido.tipo);
     
     return Card(
@@ -26,7 +26,7 @@ class PedidoCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Semantics(
-          label: 'Pedido ${pedido.numero}, status ${statusText.toLowerCase()}, total ${_formatCurrency(pedido.total)}',
+          label: 'Pedido ${pedido.numero}, total ${_formatCurrency(pedido.total)}',
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -137,25 +137,6 @@ class PedidoCard extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(String status) {
-    // Status simplificado
-    switch (status.toLowerCase()) {
-      case 'aberto':
-        return Colors.blue;
-      case 'preparando':
-        return Colors.orange;
-      case 'finalizado':
-        return Colors.green;
-      case 'cancelado':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _getStatusText(String status) {
-    return status.toUpperCase();
-  }
 
   IconData _getTypeIcon(TipoPedido tipo) {
     switch (tipo) {

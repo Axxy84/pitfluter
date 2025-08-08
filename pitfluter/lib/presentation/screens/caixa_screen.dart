@@ -32,6 +32,24 @@ class _CaixaScreenState extends State<CaixaScreen> {
     });
   }
   
+  String _extrairNomeOperador(String? observacoes) {
+    if (observacoes == null || observacoes.isEmpty) {
+      return 'Responsável: Não informado';
+    }
+    
+    // Procurar por "Operador: Nome"
+    if (observacoes.contains('Operador:')) {
+      final partes = observacoes.split('|');
+      for (final parte in partes) {
+        if (parte.trim().startsWith('Operador:')) {
+          return 'Responsável: ${parte.trim().replaceFirst('Operador:', '').trim()}';
+        }
+      }
+    }
+    
+    return 'Responsável: Não informado';
+  }
+  
   Future<void> _verificarEstadoCaixa() async {
     if (!mounted) return;
     
@@ -342,7 +360,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
                 if (caixaAtual != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    'Responsável: João Silva',
+                    _extrairNomeOperador(caixaAtual!.observacoes),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
                     ),

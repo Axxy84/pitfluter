@@ -340,4 +340,41 @@ class ImpressaoService {
       ],
     );
   }
+
+  Future<bool> imprimirContaMesa(Map<String, dynamic> detalhesMesa) async {
+    try {
+      final mesa = detalhesMesa['mesa'];
+      final pedidos = detalhesMesa['pedidos'] as List;
+      final total = detalhesMesa['total'] as double;
+      
+      final List<Map<String, dynamic>> todosItens = [];
+      
+      for (final pedido in pedidos) {
+        if (pedido['itens_pedido'] != null) {
+          for (final item in pedido['itens_pedido']) {
+            todosItens.add({
+              'quantidade': item['quantidade'],
+              'nome': item['produtos']?['nome'] ?? 'Produto',
+              'total': item['preco_unitario'] * item['quantidade'],
+            });
+          }
+        }
+      }
+
+      await imprimirComanda(
+        numeroPedido: 'Mesa ${mesa['numero']}',
+        dataPedido: DateTime.now(),
+        nomeCliente: 'Mesa ${mesa['numero']}',
+        itens: todosItens,
+        subtotal: total,
+        taxaEntrega: 0,
+        total: total,
+        observacoesPedido: 'Conta da Mesa',
+      );
+      
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 }

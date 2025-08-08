@@ -4,6 +4,7 @@ import '../widgets/produtos_content.dart';
 import '../screens/caixa_screen.dart';
 import '../screens/historico_caixas_screen.dart';
 import '../screens/lista_pedidos_screen.dart';
+import '../screens/mesas_abertas_screen.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -22,10 +23,12 @@ class _MainLayoutState extends State<MainLayout> {
       case 1:
         return const _PedidosContent();
       case 2:
-        return const _ProdutosContent();
+        return const _MesasAbertasContent();
       case 3:
-        return const _CaixaContent();
+        return const _ProdutosContent();
       case 4:
+        return const _CaixaContent();
+      case 5:
         return const _HistoricoContent();
       default:
         return const _DashboardContent();
@@ -42,6 +45,11 @@ class _MainLayoutState extends State<MainLayout> {
       icon: Icons.receipt_long,
       label: 'Pedidos',
       route: '/pedidos',
+    ),
+    _NavigationItem(
+      icon: Icons.table_restaurant,
+      label: 'Mesas Abertas',
+      route: '/mesas-abertas',
     ),
     _NavigationItem(
       icon: Icons.inventory_2,
@@ -253,6 +261,15 @@ class _PedidosContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const ListaPedidosScreen();
+  }
+}
+
+class _MesasAbertasContent extends StatelessWidget {
+  const _MesasAbertasContent();
+
+  @override
+  Widget build(BuildContext context) {
+    return const MesasAbertasScreen();
   }
 }
 

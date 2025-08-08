@@ -2103,6 +2103,11 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         // Removido campo status que estava causando erro de constraint
       };
       
+      // Adicionar mesa_id se for pedido de mesa
+      if (_tipoPedido == 'mesa') {
+        pedidoData['mesa_id'] = _mesaSelecionada;
+      }
+      
       // Adicionar campos opcionais se tiverem valor
       if (valorPago != null) {
         pedidoData['valor_pago'] = valorPago;

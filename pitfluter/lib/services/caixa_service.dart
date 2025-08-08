@@ -37,27 +37,39 @@ class CaixaService {
 
   Future<EstadoCaixa> verificarEstadoCaixa() async {
     try {
+      print('CaixaService: Fazendo consulta na tabela caixa...');
+      
       final response = await _supabase
           .from('caixa')
           .select()
           .order('data_abertura', ascending: false)
           .limit(1);
       
+      print('CaixaService: Consulta executada. Registros encontrados: ${response.length}');
+      
       if (response.isEmpty) {
+        print('CaixaService: Nenhum caixa encontrado, retornando aberto: false');
         return EstadoCaixa(aberto: false);
       }
       
       final ultimoCaixa = response.first;
       final bool aberto = ultimoCaixa['data_fechamento'] == null;
       
-      return EstadoCaixa(
+      print('CaixaService: Último caixa - ID: ${ultimoCaixa['id']}, Data fechamento: ${ultimoCaixa['data_fechamento']}, Aberto: $aberto');
+      
+      final estado = EstadoCaixa(
         aberto: aberto,
         dataAbertura: ultimoCaixa['data_abertura'],
         saldoInicial: ultimoCaixa['saldo_inicial']?.toDouble(),
         id: ultimoCaixa['id'],
       );
       
-    } catch (e) {
+      print('CaixaService: Estado retornado: Aberto: ${estado.aberto}, ID: ${estado.id}');
+      return estado;
+      
+    } catch (e, stackTrace) {
+      print('CaixaService: ERRO ao verificar estado do caixa: $e');
+      print('CaixaService: Stack trace: $stackTrace');
       throw Exception('Erro ao verificar estado do caixa: $e');
     }
   }

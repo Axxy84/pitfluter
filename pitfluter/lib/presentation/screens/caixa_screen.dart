@@ -177,7 +177,19 @@ class _CaixaScreenState extends State<CaixaScreen> {
       print('📊 [CaixaScreen] Vendas encontradas: ${vendas.length}');
       
       for (final venda in vendas) {
-        print('   Venda: #${venda['numero']} - R\$ ${venda['total']} - ${venda['forma_pagamento']}');
+        print('   Venda: #${venda['numero']} - R\$ ${venda['total']} - ${venda['forma_pagamento']} - Tipo: ${venda['tipo']}');
+        
+        // Adicionar o tipo de pedido na descrição para facilitar a contagem
+        final tipoPedido = venda['tipo'] ?? 'balcao';
+        String tipoTexto = '';
+        if (tipoPedido == 'entrega' || tipoPedido == 'delivery') {
+          tipoTexto = ' (Delivery)';
+        } else if (tipoPedido == 'mesa') {
+          tipoTexto = ' (Mesa)';
+        } else {
+          tipoTexto = ' (Balcão)';
+        }
+        
         movimentacoes.add(
           MovimentoCaixa(
             id: venda['id'],
@@ -185,7 +197,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
             tipo: TipoMovimento.venda,
             valor: (venda['total'] ?? 0).toDouble(),
             formaPagamento: _parseFormaPagamento(venda['forma_pagamento']),
-            descricao: 'Pedido #${venda['numero'] ?? venda['id']}',
+            descricao: 'Pedido #${venda['numero'] ?? venda['id']}$tipoTexto',
             dataHora: DateTime.parse(venda['created_at']),
             dataCadastro: venda['created_at'],
           ),
@@ -454,6 +466,11 @@ class _CaixaScreenState extends State<CaixaScreen> {
           ],
         ),
         
+        const SizedBox(height: 16),
+        
+        // Quarta linha - Vendas por Tipo
+        _buildVendasPorTipo(),
+        
         const SizedBox(height: 24),
         
         // Gráfico de Formas de Pagamento
@@ -673,6 +690,159 @@ class _CaixaScreenState extends State<CaixaScreen> {
                 final movimento = movimentacoes[index];
                 return _buildItemMovimentacao(movimento);
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVendasPorTipo() {
+    // Calcular vendas por tipo
+    int vendasBalcao = 0;
+    int vendasDelivery = 0;
+    int vendasMesa = 0;
+    double totalBalcao = 0.0;
+    double totalDelivery = 0.0;
+    double totalMesa = 0.0;
+    
+    for (final movimento in movimentacoes) {
+      if (movimento.tipo == TipoMovimento.venda) {
+        // Tentar identificar o tipo pela descrição ou buscar no banco
+        final descricao = movimento.descricao?.toLowerCase() ?? '';
+        
+        // Por enquanto vamos usar a descrição, mas idealmente buscaríamos o tipo real
+        if (descricao.contains('balcão') || descricao.contains('balcao')) {
+          vendasBalcao++;
+          totalBalcao += movimento.valor;
+        } else if (descricao.contains('delivery') || descricao.contains('entrega')) {
+          vendasDelivery++;
+          totalDelivery += movimento.valor;
+        } else if (descricao.contains('mesa')) {
+          vendasMesa++;
+          totalMesa += movimento.valor;
+        } else {
+          // Por padrão, considerar como balcão
+          vendasBalcao++;
+          totalBalcao += movimento.valor;
+        }
+      }
+    }
+    
+    return Row(
+      children: [
+        Expanded(
+          child: _buildCardTipoVenda(
+            titulo: 'Balcão',
+            quantidade: vendasBalcao,
+            valor: totalBalcao,
+            icone: Icons.storefront,
+            cor: Colors.blue[600]!,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildCardTipoVenda(
+            titulo: 'Delivery',
+            quantidade: vendasDelivery,
+            valor: totalDelivery,
+            icone: Icons.delivery_dining,
+            cor: Colors.orange[600]!,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildCardTipoVenda(
+            titulo: 'Mesa',
+            quantidade: vendasMesa,
+            valor: totalMesa,
+            icone: Icons.table_restaurant,
+            cor: Colors.purple[600]!,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildCardTipoVenda({
+    required String titulo,
+    required int quantidade,
+    required double valor,
+    required IconData icone,
+    required Color cor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cor.withValues(alpha: 0.8),
+            cor,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: cor.withValues(alpha: 0.3),
+            spreadRadius: 1,
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icone,
+                color: Colors.white,
+                size: 28,
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$quantidade',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            titulo,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'R\$ ${valor.toStringAsFixed(2)}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            quantidade == 1 ? '$quantidade venda' : '$quantidade vendas',
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 12,
             ),
           ),
         ],

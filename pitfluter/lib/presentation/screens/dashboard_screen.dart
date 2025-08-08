@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -16,6 +18,18 @@ class _DashboardScreenState extends State<DashboardScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  
+  final supabase = Supabase.instance.client;
+  
+  // Dados reais
+  double totalVendasHoje = 0.0;
+  int quantidadePedidosHoje = 0;
+  double ticketMedio = 0.0;
+  List<Map<String, dynamic>> pedidosRecentes = [];
+  Map<String, double> vendasPorTipo = {'Balcão': 0, 'Delivery': 0, 'Mesa': 0};
+  Map<String, double> formasPagamento = {'Dinheiro': 0, 'PIX': 0, 'Cartão': 0};
+  Map<String, double> vendasPorCategoria = {'Pizza': 0, 'Bebidas': 0, 'Sobremesas': 0};
+  List<double> vendasUltimos7Dias = [];
 
   final List<String> periods = ['Hoje', 'Semana', 'Mês'];
 
@@ -34,6 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       curve: Curves.easeInOut,
     ));
     _animationController.forward();
+    _carregarDadosReais();
   }
 
   @override
@@ -42,13 +57,120 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
+  Future<void> _carregarDadosReais() async {
+    try {
+      final hoje = DateTime.now();
+      DateTime inicio;
+      
+      // Determinar período baseado na seleção
+      switch (selectedPeriod) {
+        case 'Hoje':
+          inicio = DateTime(hoje.year, hoje.month, hoje.day);
+          break;
+        case 'Semana':
+          inicio = hoje.subtract(const Duration(days: 7));
+          break;
+        case 'Mês':
+          inicio = DateTime(hoje.year, hoje.month - 1, hoje.day);
+          break;
+        default:
+          inicio = DateTime(hoje.year, hoje.month, hoje.day);
+      }
+      
+      final response = await supabase
+          .from('pedidos')
+          .select()
+          .gte('created_at', inicio.toIso8601String());
+      
+      // Resetar contadores
+      totalVendasHoje = 0.0;
+      quantidadePedidosHoje = 0;
+      vendasPorTipo = {'Balcão': 0, 'Delivery': 0, 'Mesa': 0};
+      formasPagamento = {'Dinheiro': 0, 'PIX': 0, 'Cartão': 0};
+      
+      // Processar pedidos
+      for (final pedido in response) {
+        final valor = (pedido['total'] ?? 0).toDouble();
+        totalVendasHoje += valor;
+        quantidadePedidosHoje++;
+        
+        // Contar por tipo
+        final tipo = pedido['tipo'] ?? 'balcao';
+        if (tipo == 'entrega' || tipo == 'delivery') {
+          vendasPorTipo['Delivery'] = (vendasPorTipo['Delivery'] ?? 0) + valor;
+        } else if (tipo == 'mesa') {
+          vendasPorTipo['Mesa'] = (vendasPorTipo['Mesa'] ?? 0) + valor;
+        } else {
+          vendasPorTipo['Balcão'] = (vendasPorTipo['Balcão'] ?? 0) + valor;
+        }
+        
+        // Contar por forma de pagamento
+        final formaPagamento = pedido['forma_pagamento'] ?? 'Dinheiro';
+        if (formaPagamento == 'PIX') {
+          formasPagamento['PIX'] = (formasPagamento['PIX'] ?? 0) + valor;
+        } else if (formaPagamento == 'Cartão') {
+          formasPagamento['Cartão'] = (formasPagamento['Cartão'] ?? 0) + valor;
+        } else {
+          formasPagamento['Dinheiro'] = (formasPagamento['Dinheiro'] ?? 0) + valor;
+        }
+      }
+      
+      // Calcular ticket médio
+      if (quantidadePedidosHoje > 0) {
+        ticketMedio = totalVendasHoje / quantidadePedidosHoje;
+      }
+      
+      // Simular dados de categoria (por enquanto distribui proporcionalmente)
+      // Em produção, você teria uma tabela de itens de pedido com categorias
+      if (totalVendasHoje > 0) {
+        vendasPorCategoria['Pizza'] = totalVendasHoje * 0.60;
+        vendasPorCategoria['Bebidas'] = totalVendasHoje * 0.25;
+        vendasPorCategoria['Sobremesas'] = totalVendasHoje * 0.15;
+      }
+      
+      // Buscar vendas dos últimos 7 dias para o gráfico de barras
+      vendasUltimos7Dias = [];
+      for (int i = 6; i >= 0; i--) {
+        final dia = hoje.subtract(Duration(days: i));
+        final inicioDia = DateTime(dia.year, dia.month, dia.day);
+        final fimDia = inicioDia.add(const Duration(days: 1));
+        
+        final vendasDia = await supabase
+            .from('pedidos')
+            .select('total')
+            .gte('created_at', inicioDia.toIso8601String())
+            .lt('created_at', fimDia.toIso8601String());
+        
+        double totalDia = 0;
+        for (final venda in vendasDia) {
+          totalDia += (venda['total'] ?? 0).toDouble();
+        }
+        vendasUltimos7Dias.add(totalDia);
+      }
+      
+      // Buscar pedidos recentes (últimos 5)
+      final recentesResponse = await supabase
+          .from('pedidos')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(5);
+      
+      pedidosRecentes = List<Map<String, dynamic>>.from(recentesResponse);
+      
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print('Erro ao carregar dados do dashboard: $e');
+    }
+  }
+
   Future<void> _refreshData() async {
     setState(() {
       isRefreshing = true;
     });
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    await _carregarDadosReais();
 
     setState(() {
       isRefreshing = false;
@@ -175,6 +297,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       setState(() {
                         selectedPeriod = period;
                       });
+                      _carregarDadosReais(); // Recarregar dados ao mudar período
                       HapticFeedback.selectionClick();
                     }
                   },
@@ -330,7 +453,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 child: Center(
                   child: CustomPaint(
                     size: const Size(150, 150),
-                    painter: PieChartPainter(),
+                    painter: PieChartPainter(vendasPorCategoria),
                   ),
                 ),
               ),
@@ -367,7 +490,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               Expanded(
                 child: CustomPaint(
                   size: const Size(double.infinity, 200),
-                  painter: BarChartPainter(),
+                  painter: BarChartPainter(vendasUltimos7Dias),
                 ),
               ),
             ],
@@ -378,10 +501,23 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildLegend(ColorScheme colorScheme) {
+    final total = vendasPorCategoria.values.fold(0.0, (a, b) => a + b);
     final items = [
-      {'color': const Color(0xFFDC2626), 'label': 'Pizza', 'value': '60%'},
-      {'color': const Color(0xFFEF4444), 'label': 'Bebidas', 'value': '25%'},
-      {'color': const Color(0xFFF87171), 'label': 'Sobremesas', 'value': '15%'},
+      {
+        'color': const Color(0xFFDC2626),
+        'label': 'Pizza',
+        'value': total > 0 ? '${((vendasPorCategoria['Pizza']! / total) * 100).toStringAsFixed(0)}%' : '0%'
+      },
+      {
+        'color': const Color(0xFFEF4444),
+        'label': 'Bebidas',
+        'value': total > 0 ? '${((vendasPorCategoria['Bebidas']! / total) * 100).toStringAsFixed(0)}%' : '0%'
+      },
+      {
+        'color': const Color(0xFFF87171),
+        'label': 'Sobremesas',
+        'value': total > 0 ? '${((vendasPorCategoria['Sobremesas']! / total) * 100).toStringAsFixed(0)}%' : '0%'
+      },
     ];
 
     return Column(
@@ -538,65 +674,94 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   List<Map<String, dynamic>> _getMetricsData() {
+    final formatador = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+    
     return [
       {
         'icon': Icons.attach_money,
         'title': 'Faturamento',
-        'value': 'R\$ 3.247',
-        'change': '+12.5%',
-        'changeIcon': Icons.arrow_upward,
+        'value': formatador.format(totalVendasHoje),
+        'change': quantidadePedidosHoje > 0 ? '+${quantidadePedidosHoje}' : '0',
+        'changeIcon': Icons.shopping_cart,
         'changeColor': Colors.green,
       },
       {
         'icon': Icons.shopping_cart,
         'title': 'Pedidos',
-        'value': '127',
-        'change': '+8.2%',
-        'changeIcon': Icons.arrow_upward,
-        'changeColor': Colors.green,
+        'value': quantidadePedidosHoje.toString(),
+        'change': ticketMedio > 0 ? formatador.format(ticketMedio) : 'R\$ 0',
+        'changeIcon': Icons.attach_money,
+        'changeColor': Colors.blue,
       },
       {
-        'icon': Icons.kitchen,
-        'title': 'Em Preparo',
-        'value': '8',
-        'change': '-2.1%',
-        'changeIcon': Icons.arrow_downward,
-        'changeColor': Colors.orange,
+        'icon': Icons.receipt_long,
+        'title': 'Ticket Médio',
+        'value': formatador.format(ticketMedio),
+        'change': 'Média/pedido',
+        'changeIcon': Icons.trending_up,
+        'changeColor': Colors.purple,
       },
     ];
   }
 
   List<Map<String, dynamic>> _getRecentActivities() {
-    return [
-      {
-        'icon': Icons.shopping_bag,
-        'title': 'Pedido #1234 entregue',
-        'subtitle': 'Pizza Margherita - João Silva',
-        'time': '2 min',
-        'color': Colors.green,
-      },
-      {
-        'icon': Icons.kitchen,
-        'title': 'Pedido #1235 em preparo',
-        'subtitle': 'Pizza Pepperoni - Maria Santos',
-        'time': '8 min',
-        'color': Colors.orange,
-      },
-      {
-        'icon': Icons.access_time,
-        'title': 'Novo pedido recebido',
-        'subtitle': 'Pizza Quattro Stagioni - Pedro Costa',
-        'time': '15 min',
-        'color': const Color(0xFFDC2626),
-      },
-      {
-        'icon': Icons.person_add,
-        'title': 'Novo cliente cadastrado',
-        'subtitle': 'Ana Oliveira se registrou',
-        'time': '1 hora',
-        'color': Colors.blue,
-      },
-    ];
+    if (pedidosRecentes.isEmpty) {
+      return [
+        {
+          'icon': Icons.info_outline,
+          'title': 'Nenhum pedido ainda',
+          'subtitle': 'Os pedidos aparecerão aqui',
+          'time': 'Agora',
+          'color': Colors.grey,
+        },
+      ];
+    }
+    
+    final formatador = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+    final agora = DateTime.now();
+    
+    return pedidosRecentes.map((pedido) {
+      final dataHora = DateTime.parse(pedido['created_at']);
+      final diferenca = agora.difference(dataHora);
+      String tempoAtras;
+      
+      if (diferenca.inMinutes < 1) {
+        tempoAtras = 'Agora';
+      } else if (diferenca.inMinutes < 60) {
+        tempoAtras = '${diferenca.inMinutes} min';
+      } else if (diferenca.inHours < 24) {
+        tempoAtras = '${diferenca.inHours}h';
+      } else {
+        tempoAtras = '${diferenca.inDays}d';
+      }
+      
+      final tipo = pedido['tipo'] ?? 'balcao';
+      IconData icone;
+      Color cor;
+      String tipoTexto;
+      
+      if (tipo == 'entrega' || tipo == 'delivery') {
+        icone = Icons.delivery_dining;
+        cor = Colors.orange;
+        tipoTexto = 'Delivery';
+      } else if (tipo == 'mesa') {
+        icone = Icons.table_restaurant;
+        cor = Colors.purple;
+        tipoTexto = 'Mesa';
+      } else {
+        icone = Icons.storefront;
+        cor = Colors.blue;
+        tipoTexto = 'Balcão';
+      }
+      
+      return {
+        'icon': icone,
+        'title': 'Pedido #${pedido['numero'] ?? pedido['id']}',
+        'subtitle': '$tipoTexto - ${formatador.format(pedido['total'] ?? 0)}',
+        'time': tempoAtras,
+        'color': cor,
+      };
+    }).toList();
   }
 
   Widget _buildDrawer(BuildContext context) {
@@ -693,17 +858,30 @@ class _DashboardScreenState extends State<DashboardScreen>
 }
 
 class PieChartPainter extends CustomPainter {
+  final Map<String, double> vendas;
+  
+  PieChartPainter(this.vendas);
+  
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2 - 10;
 
     final paint = Paint()..style = PaintingStyle.fill;
+    
+    final total = vendas.values.fold(0.0, (a, b) => a + b);
+    
+    if (total == 0) {
+      // Desenhar gráfico vazio
+      paint.color = Colors.grey.shade300;
+      canvas.drawCircle(center, radius, paint);
+      return;
+    }
 
     final data = [
-      {'value': 0.60, 'color': const Color(0xFFDC2626)},
-      {'value': 0.25, 'color': const Color(0xFFEF4444)},
-      {'value': 0.15, 'color': const Color(0xFFF87171)},
+      {'value': vendas['Pizza']! / total, 'color': const Color(0xFFDC2626)},
+      {'value': vendas['Bebidas']! / total, 'color': const Color(0xFFEF4444)},
+      {'value': vendas['Sobremesas']! / total, 'color': const Color(0xFFF87171)},
     ];
 
     double startAngle = -math.pi / 2;
@@ -725,42 +903,62 @@ class PieChartPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(PieChartPainter oldDelegate) => oldDelegate.vendas != vendas;
 }
 
 class BarChartPainter extends CustomPainter {
+  final List<double> vendas;
+  
+  BarChartPainter(this.vendas);
+  
   @override
   void paint(Canvas canvas, Size size) {
+    if (vendas.isEmpty) return;
+    
     final paint = Paint()..color = const Color(0xFFDC2626);
-    final data = [1200.0, 1800.0, 1500.0, 2200.0, 1900.0, 2500.0, 2100.0];
+    final data = vendas.isEmpty ? [0.0] : vendas;
     
     final barWidth = size.width / (data.length * 2);
-    final maxValue = data.reduce(math.max);
+    final maxValue = data.isEmpty || data.every((v) => v == 0) 
+        ? 100.0 
+        : data.reduce(math.max);
     final maxHeight = size.height - 20;
 
     for (int i = 0; i < data.length; i++) {
-      final barHeight = (maxHeight * data[i]) / maxValue;
-      final left = i * barWidth * 2 + barWidth * 0.5;
-      final top = size.height - barHeight;
+      if (data[i] == 0 && maxValue == 100) {
+        // Desenhar barra vazia
+        final left = i * barWidth * 2 + barWidth * 0.5;
+        final rect = Rect.fromLTWH(left, size.height - 5, barWidth, 5);
+        paint.color = Colors.grey.shade300;
+        paint.shader = null;
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(4)),
+          paint,
+        );
+      } else {
+        final barHeight = (maxHeight * data[i]) / maxValue;
+        final left = i * barWidth * 2 + barWidth * 0.5;
+        final top = size.height - barHeight;
 
-      final rect = Rect.fromLTWH(left, top, barWidth, barHeight);
-      
-      final gradient = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          const Color(0xFFDC2626),
-          const Color(0xFFDC2626).withValues(alpha: 0.7),
-        ],
-      );
+        final rect = Rect.fromLTWH(left, top, barWidth, barHeight);
+        
+        final gradient = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFFDC2626),
+            const Color(0xFFDC2626).withValues(alpha: 0.7),
+          ],
+        );
 
-      paint.shader = gradient.createShader(rect);
-      
-      final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(4));
-      canvas.drawRRect(rrect, paint);
+        paint.shader = gradient.createShader(rect);
+        
+        final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(4));
+        canvas.drawRRect(rrect, paint);
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(BarChartPainter oldDelegate) => oldDelegate.vendas != vendas;
 }

@@ -96,14 +96,14 @@ class RelatorioCaixaService {
         pw.SizedBox(height: 8),
         pw.Text(
           'Número: ${caixa.generateReportNumber()}',
-          style: pw.TextStyle(
+          style: const pw.TextStyle(
             fontSize: 14,
             color: PdfColors.grey700,
           ),
         ),
         pw.Text(
           'Gerado em: ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}',
-          style: pw.TextStyle(
+          style: const pw.TextStyle(
             fontSize: 12,
             color: PdfColors.grey700,
           ),
@@ -343,7 +343,7 @@ class RelatorioCaixaService {
         padding: const pw.EdgeInsets.all(16),
         child: pw.Text(
           'Nenhuma movimentação registrada.',
-          style: pw.TextStyle(fontSize: 12, color: PdfColors.grey),
+          style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey),
         ),
       );
     }
@@ -412,28 +412,28 @@ class RelatorioCaixaService {
           padding: const pw.EdgeInsets.all(6),
           child: pw.Text(
             DateFormat('dd/MM/yy').format(mov.dataHora),
-            style: pw.TextStyle(fontSize: 9),
+            style: const pw.TextStyle(fontSize: 9),
           ),
         ),
         pw.Padding(
           padding: const pw.EdgeInsets.all(6),
           child: pw.Text(
             DateFormat('HH:mm').format(mov.dataHora),
-            style: pw.TextStyle(fontSize: 9),
+            style: const pw.TextStyle(fontSize: 9),
           ),
         ),
         pw.Padding(
           padding: const pw.EdgeInsets.all(6),
           child: pw.Text(
             mov.descricao,
-            style: pw.TextStyle(fontSize: 9),
+            style: const pw.TextStyle(fontSize: 9),
           ),
         ),
         pw.Padding(
           padding: const pw.EdgeInsets.all(6),
           child: pw.Text(
             _getTipoMovimentoDescricao(mov.tipo),
-            style: pw.TextStyle(fontSize: 9),
+            style: const pw.TextStyle(fontSize: 9),
           ),
         ),
         pw.Padding(

@@ -295,7 +295,7 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
                         
                         return ListTile(
                           selected: isSelected,
-                          selectedTileColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                          selectedTileColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                           title: Text(produto['nome'] ?? 'Sem nome'),
                           subtitle: Text(produto['descricao'] ?? ''),
                           trailing: Column(
@@ -350,7 +350,7 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
                             });
                           },
                         );
-                      }).toList(),
+                      }),
                       const Divider(),
                     ],
                   ),
@@ -450,19 +450,25 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
                   'observacoes': observacoesCompletas,
                 };
                 
+                // Salvar contexto antes da operação async
+                final navigator = Navigator.of(context);
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                
                 final success = await _mesaService.adicionarConsumo(mesaId, itemData);
                 
-                if (success && mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (success) {
+                  if (!mounted) return;
+                  navigator.pop();
+                  scaffoldMessenger.showSnackBar(
                     const SnackBar(content: Text('Consumo adicionado com sucesso!')),
                   );
                   
                   // Recarregar detalhes da mesa
-                  Navigator.of(context).pop();
+                  navigator.pop();
                   _carregarMesasAbertas();
-                } else if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                } else {
+                  if (!mounted) return;
+                  scaffoldMessenger.showSnackBar(
                     const SnackBar(
                       content: Text('Erro ao adicionar consumo'),
                       backgroundColor: Colors.red,
@@ -493,19 +499,19 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
           children: [
             ListTile(
               title: const Text('Dinheiro'),
-              onTap: () => Navigator.of(context).pop('dinheiro'),
+              onTap: () => Navigator.of(context).pop('Dinheiro'),
             ),
             ListTile(
               title: const Text('Cartão de Crédito'),
-              onTap: () => Navigator.of(context).pop('cartao_credito'),
+              onTap: () => Navigator.of(context).pop('Cartão'),
             ),
             ListTile(
               title: const Text('Cartão de Débito'),
-              onTap: () => Navigator.of(context).pop('cartao_debito'),
+              onTap: () => Navigator.of(context).pop('Cartão'),
             ),
             ListTile(
               title: const Text('PIX'),
-              onTap: () => Navigator.of(context).pop('pix'),
+              onTap: () => Navigator.of(context).pop('PIX'),
             ),
           ],
         ),

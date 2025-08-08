@@ -37,7 +37,7 @@ class MesaService {
 
       return mesasMap.values.toList();
     } catch (e) {
-      print('Erro ao buscar mesas abertas: $e');
+      // DEBUG: Erro ao buscar mesas abertas: $e
       return [];
     }
   }
@@ -72,7 +72,7 @@ class MesaService {
         'total': total,
       };
     } catch (e) {
-      print('Erro ao buscar detalhes da mesa: $e');
+      // DEBUG: Erro ao buscar detalhes da mesa: $e
       return null;
     }
   }
@@ -95,7 +95,7 @@ class MesaService {
 
       return true;
     } catch (e) {
-      print('Erro ao fechar conta da mesa: $e');
+      // DEBUG: Erro ao fechar conta da mesa: $e
       return false;
     }
   }
@@ -109,7 +109,7 @@ class MesaService {
 
       return true;
     } catch (e) {
-      print('Erro ao abrir mesa: $e');
+      // DEBUG: Erro ao abrir mesa: $e
       return false;
     }
   }
@@ -118,7 +118,7 @@ class MesaService {
     try {
       // Criar novo pedido para o consumo adicional
       final pedidoData = {
-        'numero': 'MESA-${mesaId}-${DateTime.now().millisecondsSinceEpoch}',
+        'numero': 'MESA-$mesaId-${DateTime.now().millisecondsSinceEpoch}',
         'mesa_id': mesaId,
         'tipo': 'mesa',
         'total': itemData['total'],
@@ -148,7 +148,7 @@ class MesaService {
 
       return true;
     } catch (e) {
-      print('Erro ao adicionar consumo: $e');
+      // DEBUG: Erro ao adicionar consumo: $e
       return false;
     }
   }

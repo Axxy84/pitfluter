@@ -59,6 +59,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Future<void> _carregarDadosReais() async {
     try {
+      print('🔄 [Dashboard] Carregando dados...');
       final hoje = DateTime.now();
       DateTime inicio;
       
@@ -77,10 +78,15 @@ class _DashboardScreenState extends State<DashboardScreen>
           inicio = DateTime(hoje.year, hoje.month, hoje.day);
       }
       
+      print('   📅 Período: $selectedPeriod');
+      print('   📅 Buscando a partir de: ${inicio.toIso8601String()}');
+      
       final response = await supabase
           .from('pedidos')
           .select()
           .gte('created_at', inicio.toIso8601String());
+      
+      print('   ✅ Pedidos encontrados: ${response.length}');
       
       // Resetar contadores
       totalVendasHoje = 0.0;
@@ -89,10 +95,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       formasPagamento = {'Dinheiro': 0, 'PIX': 0, 'Cartão': 0};
       
       // Processar pedidos
+      print('   💰 Processando ${response.length} pedidos...');
       for (final pedido in response) {
         final valor = (pedido['total'] ?? 0).toDouble();
         totalVendasHoje += valor;
         quantidadePedidosHoje++;
+        
+        print('      Pedido #${pedido['numero']}: R\$ $valor - ${pedido['tipo']} - ${pedido['forma_pagamento']}');
         
         // Contar por tipo
         final tipo = pedido['tipo'] ?? 'balcao';
@@ -118,7 +127,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       // Calcular ticket médio
       if (quantidadePedidosHoje > 0) {
         ticketMedio = totalVendasHoje / quantidadePedidosHoje;
+      } else {
+        ticketMedio = 0;
       }
+      
+      print('   📊 Total vendas: R\$ $totalVendasHoje');
+      print('   📊 Quantidade pedidos: $quantidadePedidosHoje');
+      print('   📊 Ticket médio: R\$ $ticketMedio');
       
       // Simular dados de categoria (por enquanto distribui proporcionalmente)
       // Em produção, você teria uma tabela de itens de pedido com categorias
@@ -126,6 +141,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         vendasPorCategoria['Pizza'] = totalVendasHoje * 0.60;
         vendasPorCategoria['Bebidas'] = totalVendasHoje * 0.25;
         vendasPorCategoria['Sobremesas'] = totalVendasHoje * 0.15;
+      } else {
+        vendasPorCategoria = {'Pizza': 0, 'Bebidas': 0, 'Sobremesas': 0};
       }
       
       // Buscar vendas dos últimos 7 dias para o gráfico de barras
@@ -160,8 +177,11 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (mounted) {
         setState(() {});
       }
+      
+      print('✅ [Dashboard] Dados carregados com sucesso!');
     } catch (e) {
-      print('Erro ao carregar dados do dashboard: $e');
+      print('❌ [Dashboard] Erro ao carregar dados: $e');
+      print('   Stack trace: ${StackTrace.current}');
     }
   }
 
@@ -223,10 +243,59 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.pushNamed(context, '/novo-pedido'),
-        icon: const Icon(Icons.add),
-        label: const Text('Novo Pedido'),
+      floatingActionButton: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'test',
+            onPressed: () async {
+              // Criar pedido de teste
+              try {
+                final ultimoPedido = await supabase
+                    .from('pedidos')
+                    .select('numero')
+                    .order('numero', ascending: false)
+                    .limit(1);
+                
+                int proximoNumero = 1;
+                if (ultimoPedido.isNotEmpty && ultimoPedido.first['numero'] != null) {
+                  proximoNumero = ultimoPedido.first['numero'] + 1;
+                }
+                
+                await supabase.from('pedidos').insert({
+                  'numero': proximoNumero,
+                  'tipo': 'balcao',
+                  'total': 45.50,
+                  'forma_pagamento': 'Dinheiro',
+                  'observacoes': 'Pedido de teste',
+                });
+                
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Pedido #$proximoNumero criado!')),
+                  );
+                  
+                  _carregarDadosReais();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erro: $e')),
+                  );
+                }
+              }
+            },
+            child: const Icon(Icons.bug_report),
+            backgroundColor: Colors.orange,
+          ),
+          const SizedBox(width: 16),
+          FloatingActionButton.extended(
+            heroTag: 'novo',
+            onPressed: () => Navigator.pushNamed(context, '/novo-pedido'),
+            icon: const Icon(Icons.add),
+            label: const Text('Novo Pedido'),
+          ),
+        ],
       ),
     );
   }

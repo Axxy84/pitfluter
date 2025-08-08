@@ -1188,34 +1188,28 @@ class _CaixaScreenState extends State<CaixaScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Campo com autocomplete para operador
-            Autocomplete<String>(
-              optionsBuilder: (TextEditingValue textEditingValue) {
-                if (textEditingValue.text.isEmpty) {
-                  return operadoresComuns;
-                }
-                return operadoresComuns.where((String option) {
-                  return option.toLowerCase().contains(
-                    textEditingValue.text.toLowerCase(),
-                  );
-                });
-              },
-              onSelected: (String selection) {
-                nomeUsuarioController.text = selection;
-              },
-              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                nomeUsuarioController.text = controller.text;
-                return TextField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome do Operador',
-                    prefixIcon: Icon(Icons.person),
-                    hintText: 'Digite ou selecione o operador',
-                  ),
-                  autofocus: true,
+            // Campo simples com sugestões via Chip
+            TextField(
+              controller: nomeUsuarioController,
+              decoration: const InputDecoration(
+                labelText: 'Nome do Operador',
+                prefixIcon: Icon(Icons.person),
+                hintText: 'Digite o nome do operador',
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 8),
+            // Sugestões de nomes comuns
+            Wrap(
+              spacing: 8,
+              children: operadoresComuns.map((nome) {
+                return ActionChip(
+                  label: Text(nome),
+                  onPressed: () {
+                    nomeUsuarioController.text = nome;
+                  },
                 );
-              },
+              }).toList(),
             ),
             const SizedBox(height: 16),
             TextField(

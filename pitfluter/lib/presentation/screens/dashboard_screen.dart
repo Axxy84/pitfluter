@@ -269,8 +269,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                 }
               }
             },
-            child: const Icon(Icons.bug_report),
             backgroundColor: Colors.orange,
+            child: const Icon(Icons.bug_report),
           ),
           const SizedBox(width: 16),
           FloatingActionButton.extended(
@@ -734,7 +734,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         'icon': Icons.attach_money,
         'title': 'Faturamento',
         'value': formatador.format(totalVendasHoje),
-        'change': quantidadePedidosHoje > 0 ? '+${quantidadePedidosHoje}' : '0',
+        'change': quantidadePedidosHoje > 0 ? '+$quantidadePedidosHoje' : '0',
         'changeIcon': Icons.shopping_cart,
         'changeColor': Colors.green,
       },

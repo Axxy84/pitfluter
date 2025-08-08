@@ -498,7 +498,7 @@ class _DashboardContentState extends State<DashboardContent>
                             ),
                           ],
                         ),
-                      )).toList(),
+                      )),
                   ],
                 ),
               ),
@@ -589,7 +589,7 @@ class _DashboardContentState extends State<DashboardContent>
                       ),
                     ),
                   );
-                }).toList(),
+                }),
             ],
           ),
         ),

@@ -1540,7 +1540,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                     border: OutlineInputBorder(),
                     prefixText: 'R\$ ',
                   ),
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Preço é obrigatório';
@@ -1572,7 +1572,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                         ),
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
               ],
             ),
@@ -1612,7 +1612,7 @@ class _EditProductDialogState extends State<_EditProductDialog> {
             border: OutlineInputBorder(),
             prefixText: 'R\$ ',
           ),
-          keyboardType: TextInputType.numberWithOptions(decimal: true),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
         ),
         actions: [
           TextButton(

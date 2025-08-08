@@ -343,7 +343,7 @@ class RelatorioCaixaService {
         padding: const pw.EdgeInsets.all(16),
         child: pw.Text(
           'Nenhuma movimentação registrada.',
-          style: const pw.TextStyle(fontSize: 12, color: PdfColors.grey),
+          style: pw.TextStyle(fontSize: 12, color: PdfColors.grey),
         ),
       );
     }
@@ -412,28 +412,28 @@ class RelatorioCaixaService {
           padding: const pw.EdgeInsets.all(6),
           child: pw.Text(
             DateFormat('dd/MM/yy').format(mov.dataHora),
-            style: const pw.TextStyle(fontSize: 9),
+            style: pw.TextStyle(fontSize: 9),
           ),
         ),
         pw.Padding(
           padding: const pw.EdgeInsets.all(6),
           child: pw.Text(
             DateFormat('HH:mm').format(mov.dataHora),
-            style: const pw.TextStyle(fontSize: 9),
+            style: pw.TextStyle(fontSize: 9),
           ),
         ),
         pw.Padding(
           padding: const pw.EdgeInsets.all(6),
           child: pw.Text(
             mov.descricao,
-            style: const pw.TextStyle(fontSize: 9),
+            style: pw.TextStyle(fontSize: 9),
           ),
         ),
         pw.Padding(
           padding: const pw.EdgeInsets.all(6),
           child: pw.Text(
             _getTipoMovimentoDescricao(mov.tipo),
-            style: const pw.TextStyle(fontSize: 9),
+            style: pw.TextStyle(fontSize: 9),
           ),
         ),
         pw.Padding(

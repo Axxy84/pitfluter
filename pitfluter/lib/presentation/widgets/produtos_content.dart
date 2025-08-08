@@ -44,8 +44,17 @@ class _ProdutosContentState extends State<ProdutosContent>
     });
 
     try {
-      // Primeiro carregar produtos com seus preços da tabela relacionada
-      final produtosResponse = await supabase
+      // Primeiro, buscar o ID da categoria "Pizzas Promocionais" para excluí-la
+      final categPromoResponse = await supabase
+          .from('produtos_categoria')
+          .select('id')
+          .eq('nome', 'Pizzas Promocionais')
+          .maybeSingle();
+      
+      final categPromoId = categPromoResponse?['id'];
+      
+      // Carregar produtos com seus preços, excluindo os da categoria promocional
+      var query = supabase
           .from('produtos_produto')
           .select('''
             *,
@@ -57,8 +66,14 @@ class _ProdutosContentState extends State<ProdutosContent>
                 nome
               )
             )
-          ''')
-          .order('nome');
+          ''');
+      
+      // Excluir produtos da categoria promocional se ela existir
+      if (categPromoId != null) {
+        query = query.neq('categoria_id', categPromoId);
+      }
+      
+      final produtosResponse = await query.order('nome');
 
       produtos = List<Map<String, dynamic>>.from(produtosResponse);
       
@@ -74,7 +89,10 @@ class _ProdutosContentState extends State<ProdutosContent>
           .eq('ativo', true)
           .order('nome');
 
-      final todasCategorias = List<Map<String, dynamic>>.from(todasCategoriasResponse);
+      // Filtrar para remover "Pizzas Promocionais"
+      final todasCategorias = List<Map<String, dynamic>>.from(todasCategoriasResponse)
+          .where((cat) => cat['nome'] != 'Pizzas Promocionais')
+          .toList();
       
       // Usar as categorias reais do banco, mas filtrar Sobremesas se não tiver produtos
       categorias = todasCategorias.map((cat) => {
@@ -480,36 +498,96 @@ class _ProdutoCard extends StatelessWidget {
                     
                     // Preço - usando produtos_produtopreco
                     Builder(builder: (context) {
-                      // Pegar o primeiro preço disponível
                       final precos = produto['produtos_produtopreco'] as List?;
-                      double? preco;
                       
                       if (precos != null && precos.isNotEmpty) {
-                        // Pegar o preço promocional se existir, senão o preço normal
-                        preco = precos[0]['preco_promocional'] ?? precos[0]['preco'];
-                      }
-                      
-                      // Se não tiver na tabela relacionada, tentar preco_unitario
-                      preco ??= produto['preco_unitario'];
-                      
-                      if (preco != null) {
-                        return Text(
-                          'R\$ ${preco.toStringAsFixed(2)}',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.primary,
-                          ),
-                        );
+                        // Se tem múltiplos tamanhos, mostrar todos os tamanhos com preços
+                        if (precos.length > 1) {
+                          // Ordenar por tamanho
+                          final precosOrdenados = List.from(precos);
+                          precosOrdenados.sort((a, b) {
+                            final tamanhoA = a['produtos_tamanho']?['nome'] ?? '';
+                            final tamanhoB = b['produtos_tamanho']?['nome'] ?? '';
+                            const ordem = ['P', 'M', 'G', 'GG'];
+                            return ordem.indexOf(tamanhoA).compareTo(ordem.indexOf(tamanhoB));
+                          });
+                          
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: precosOrdenados.map((p) {
+                                  final tamanho = p['produtos_tamanho']?['nome'] ?? '?';
+                                  final preco = p['preco_promocional'] ?? p['preco'];
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      '$tamanho: R\$ ${preco.toStringAsFixed(2)}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          );
+                        } else {
+                          // Um único preço
+                          final preco = precos[0]['preco_promocional'] ?? precos[0]['preco'];
+                          final tamanho = precos[0]['produtos_tamanho']?['nome'];
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'R\$ ${preco.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                              if (tamanho != null)
+                                Text(
+                                  'Tamanho: $tamanho',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                            ],
+                          );
+                        }
                       } else {
-                        return Text(
-                          'Consulte',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontStyle: FontStyle.italic,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        );
+                        // Tentar preco_unitario
+                        final preco = produto['preco_unitario'];
+                        if (preco != null) {
+                          return Text(
+                            'R\$ ${preco.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
+                            ),
+                          );
+                        } else {
+                          return Text(
+                            'Consulte',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontStyle: FontStyle.italic,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          );
+                        }
                       }
                     }),
                     

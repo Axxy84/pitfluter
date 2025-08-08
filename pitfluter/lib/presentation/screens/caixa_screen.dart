@@ -1169,6 +1169,17 @@ class _CaixaScreenState extends State<CaixaScreen> {
   Widget _buildDialogAbrirCaixa() {
     final valorController = TextEditingController();
     final observacoesController = TextEditingController();
+    final nomeUsuarioController = TextEditingController();
+    
+    // Lista de operadores comuns
+    final operadoresComuns = [
+      'João',
+      'Maria', 
+      'Pedro',
+      'Ana',
+      'Carlos',
+      'Juliana',
+    ];
     
     return AlertDialog(
       title: const Text('Abrir Caixa'),
@@ -1177,6 +1188,36 @@ class _CaixaScreenState extends State<CaixaScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Campo com autocomplete para operador
+            Autocomplete<String>(
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text.isEmpty) {
+                  return operadoresComuns;
+                }
+                return operadoresComuns.where((String option) {
+                  return option.toLowerCase().contains(
+                    textEditingValue.text.toLowerCase(),
+                  );
+                });
+              },
+              onSelected: (String selection) {
+                nomeUsuarioController.text = selection;
+              },
+              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                nomeUsuarioController.text = controller.text;
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome do Operador',
+                    prefixIcon: Icon(Icons.person),
+                    hintText: 'Digite ou selecione o operador',
+                  ),
+                  autofocus: true,
+                );
+              },
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: valorController,
               decoration: const InputDecoration(
@@ -1204,8 +1245,19 @@ class _CaixaScreenState extends State<CaixaScreen> {
         ),
         ElevatedButton(
           onPressed: () async {
+            final nomeUsuario = nomeUsuarioController.text.trim();
             final valor = double.tryParse(valorController.text.replaceAll(',', '.')) ?? 0;
             final observacoes = observacoesController.text;
+            
+            if (nomeUsuario.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Por favor, informe o nome do operador'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+              return;
+            }
             
             if (valor <= 0) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1220,7 +1272,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
             Navigator.of(context).pop();
             
             try {
-              await _caixaService.abrirCaixa(valor, observacoes);
+              await _caixaService.abrirCaixa(valor, observacoes, nomeUsuario);
               await _verificarEstadoCaixa();
               await _carregarDados();
               

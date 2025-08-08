@@ -62,18 +62,57 @@ class CaixaService {
     }
   }
 
-  Future<void> abrirCaixa(double saldoInicial, String observacoes) async {
+  Future<void> abrirCaixa(double saldoInicial, String observacoes, [String? nomeUsuario]) async {
     final estado = await verificarEstadoCaixa();
     if (estado.aberto) {
       throw Exception('Já existe um caixa aberto');
     }
     
-    await _supabase.from('caixa').insert({
+    // Se foi fornecido um nome, criar/buscar usuário
+    int usuarioId = 1; // Default
+    if (nomeUsuario != null && nomeUsuario.isNotEmpty) {
+      try {
+        // Primeiro tenta buscar o usuário pelo nome
+        final usuarios = await _supabase
+            .from('usuarios')
+            .select('id')
+            .eq('nome', nomeUsuario)
+            .limit(1);
+        
+        if (usuarios.isNotEmpty) {
+          usuarioId = usuarios.first['id'];
+        } else {
+          // Se não existe, cria um novo usuário
+          final novoUsuario = await _supabase
+              .from('usuarios')
+              .insert({'nome': nomeUsuario, 'ativo': true})
+              .select('id')
+              .single();
+          usuarioId = novoUsuario['id'];
+        }
+      } catch (e) {
+        // Se houver erro, usa o usuário padrão
+        usuarioId = 1;
+      }
+    }
+    
+    final dadosCaixa = {
       'data_abertura': DateTime.now().toIso8601String(),
       'saldo_inicial': saldoInicial,
       'observacoes': observacoes,
-      'usuario_id': 1, // TODO: Integrar com auth quando disponível
-    });
+      'usuario_id': usuarioId,
+    };
+    
+    // Adiciona nome_operador apenas se o campo existir na tabela
+    // Por enquanto, salvamos nas observações
+    if (nomeUsuario != null && nomeUsuario.isNotEmpty) {
+      final obsCompleta = observacoes.isEmpty 
+          ? 'Operador: $nomeUsuario'
+          : '$observacoes | Operador: $nomeUsuario';
+      dadosCaixa['observacoes'] = obsCompleta;
+    }
+    
+    await _supabase.from('caixa').insert(dadosCaixa);
   }
 
   Future<void> fecharCaixa() async {

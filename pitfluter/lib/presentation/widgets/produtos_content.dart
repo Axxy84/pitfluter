@@ -11,17 +11,17 @@ class ProdutosContent extends StatefulWidget {
 class _ProdutosContentState extends State<ProdutosContent>
     with SingleTickerProviderStateMixin {
   final supabase = Supabase.instance.client;
-  
+
   List<Map<String, dynamic>> categorias = [];
   List<Map<String, dynamic>> produtos = [];
   List<Map<String, dynamic>> filteredProdutos = [];
   Map<int, String> tamanhos = {}; // Mapa de id do tamanho para nome
   bool isLoading = true;
   String? error;
-  
+
   TabController? _tabController;
   int selectedCategoriaId = 0;
-  
+
   final TextEditingController _searchController = TextEditingController();
   bool _showInactive = false;
 
@@ -46,10 +46,9 @@ class _ProdutosContentState extends State<ProdutosContent>
 
     try {
       // Primeiro, carregar todos os tamanhos
-      final tamanhosResponse = await supabase
-          .from('produtos_tamanho')
-          .select('id, nome');
-      
+      final tamanhosResponse =
+          await supabase.from('produtos_tamanho').select('id, nome');
+
       // Criar mapa de tamanhos
       // DEBUG: Tamanhos carregados
       for (final t in tamanhosResponse) {
@@ -64,72 +63,73 @@ class _ProdutosContentState extends State<ProdutosContent>
         }
       }
       // DEBUG: Mapa de tamanhos criado: $tamanhos
-      
+
       // Buscar o ID da categoria "Pizzas Promocionais" para excluí-la
       final categPromoResponse = await supabase
           .from('produtos_categoria')
           .select('id')
           .eq('nome', 'Pizzas Promocionais')
           .maybeSingle();
-      
+
       final categPromoId = categPromoResponse?['id'];
-      
-      // Carregar produtos com seus preços, excluindo os da categoria promocional
-      var query = supabase
-          .from('produtos_produto')
-          .select('''
+
+      // Carregar produtos da tabela produtos (única fonte agora)
+      final produtosResponse = await supabase.from('produtos').select('''
             *,
-            produtos_produtopreco (
+            produtos_precos (
               preco,
               preco_promocional,
-              tamanho_id
+              tamanho_id,
+              produtos_tamanho ( id, nome )
             )
-          ''');
-      
-      // Excluir produtos da categoria promocional se ela existir
-      if (categPromoId != null) {
-        query = query.neq('categoria_id', categPromoId);
-      }
-      
-      final produtosResponse = await query.order('nome');
+          ''').order('nome');
 
       produtos = List<Map<String, dynamic>>.from(produtosResponse);
-      
+
+      // DEBUG: Verificar estrutura dos produtos
+      print('🔍 Produtos carregados: ${produtos.length}');
+      for (final p in produtos.take(3)) {
+        print('📦 Produto: ${p['nome']}');
+        print('   Preços: ${p['produtos_precos']}');
+      }
+
       // DEBUG: estrutura dos produtos carregada
-      
-      // Carregar categorias
-      final todasCategoriasResponse = await supabase
-          .from('produtos_categoria')
+
+      // Carregar categorias da tabela categorias (única fonte agora)
+      final categoriasResponse = await supabase
+          .from('categorias')
           .select('*')
           .eq('ativo', true)
           .order('nome');
 
-      // Filtrar para remover "Pizzas Promocionais"
-      final todasCategorias = List<Map<String, dynamic>>.from(todasCategoriasResponse)
-          .where((cat) => cat['nome'] != 'Pizzas Promocionais')
-          .toList();
-      
+      final todasCategorias =
+          List<Map<String, dynamic>>.from(categoriasResponse);
+
       // Usar as categorias reais do banco, mas filtrar Sobremesas se não tiver produtos
-      categorias = todasCategorias.map((cat) => {
-        'id': cat['id'],
-        'nome': cat['nome'],
-      }).toList();
-      
+      categorias = todasCategorias
+          .map((cat) => {
+                'id': cat['id'],
+                'nome': cat['nome'],
+              })
+          .toList();
+
       // Opcional: remover categoria Sobremesas se não houver produtos nela
       final catSobremesa = todasCategorias.firstWhere(
         (c) => c['nome'].toString().toLowerCase().contains('sobremesa'),
         orElse: () => {},
       );
-      
+
       if (catSobremesa.isNotEmpty) {
-        final produtosSobremesa = produtos.where((p) => p['categoria_id'] == catSobremesa['id']).toList();
+        final produtosSobremesa = produtos
+            .where((p) => p['categoria_id'] == catSobremesa['id'])
+            .toList();
         if (produtosSobremesa.isEmpty) {
           categorias.removeWhere((c) => c['id'] == catSobremesa['id']);
         }
       }
-      
+
       // DEBUG: Categorias carregadas
-      
+
       // Inicializar ou atualizar TabController
       if (_tabController == null) {
         // Criar novo controller se não existir
@@ -137,12 +137,12 @@ class _ProdutosContentState extends State<ProdutosContent>
           length: categorias.length + 1,
           vsync: this,
         );
-        
+
         _tabController?.addListener(() {
           if (mounted) {
             setState(() {
-              selectedCategoriaId = _tabController!.index == 0 
-                  ? 0 
+              selectedCategoriaId = _tabController!.index == 0
+                  ? 0
                   : categorias[_tabController!.index - 1]['id'];
             });
             _filterProdutos();
@@ -157,12 +157,12 @@ class _ProdutosContentState extends State<ProdutosContent>
           vsync: this,
           initialIndex: oldIndex.clamp(0, categorias.length),
         );
-        
+
         _tabController?.addListener(() {
           if (mounted) {
             setState(() {
-              selectedCategoriaId = _tabController!.index == 0 
-                  ? 0 
+              selectedCategoriaId = _tabController!.index == 0
+                  ? 0
                   : categorias[_tabController!.index - 1]['id'];
             });
             _filterProdutos();
@@ -189,26 +189,28 @@ class _ProdutosContentState extends State<ProdutosContent>
     setState(() {
       filteredProdutos = produtos.where((produto) {
         // Filtro por categoria
-        if (selectedCategoriaId != 0 && produto['categoria_id'] != selectedCategoriaId) {
+        if (selectedCategoriaId != 0 &&
+            produto['categoria_id'] != selectedCategoriaId) {
           return false;
         }
-        
+
         // Filtro por status ativo
         if (!_showInactive && produto['ativo'] == false) {
           return false;
         }
-        
+
         // Filtro por busca
         if (_searchController.text.isNotEmpty) {
           final searchTerm = _searchController.text.toLowerCase();
           final nome = produto['nome']?.toString().toLowerCase() ?? '';
-          final descricao = produto['descricao']?.toString().toLowerCase() ?? '';
-          
+          final descricao =
+              produto['descricao']?.toString().toLowerCase() ?? '';
+
           if (!nome.contains(searchTerm) && !descricao.contains(searchTerm)) {
             return false;
           }
         }
-        
+
         return true;
       }).toList();
     });
@@ -228,7 +230,7 @@ class _ProdutosContentState extends State<ProdutosContent>
             color: colorScheme.surface,
             border: Border(
               bottom: BorderSide(
-                color: colorScheme.outlineVariant.withValues(alpha:  0.3),
+                color: colorScheme.outlineVariant.withValues(alpha: 0.3),
               ),
             ),
           ),
@@ -281,7 +283,7 @@ class _ProdutosContentState extends State<ProdutosContent>
                   ),
                 ],
               ),
-              
+
               // Tabs de categorias
               if (_tabController != null && categorias.isNotEmpty) ...[
                 const SizedBox(height: 16),
@@ -300,7 +302,7 @@ class _ProdutosContentState extends State<ProdutosContent>
             ],
           ),
         ),
-        
+
         // Filtros e busca
         Container(
           padding: const EdgeInsets.all(16),
@@ -333,7 +335,7 @@ class _ProdutosContentState extends State<ProdutosContent>
             ],
           ),
         ),
-        
+
         // Lista de produtos
         Expanded(
           child: isLoading
@@ -343,7 +345,8 @@ class _ProdutosContentState extends State<ProdutosContent>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.error_outline, size: 48, color: colorScheme.error),
+                          Icon(Icons.error_outline,
+                              size: 48, color: colorScheme.error),
                           const SizedBox(height: 16),
                           Text('Erro ao carregar produtos: $error'),
                           const SizedBox(height: 16),
@@ -362,7 +365,8 @@ class _ProdutosContentState extends State<ProdutosContent>
                               Icon(
                                 Icons.inventory_2_outlined,
                                 size: 64,
-                                color: colorScheme.onSurfaceVariant.withValues(alpha:  0.5),
+                                color: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.5),
                               ),
                               const SizedBox(height: 16),
                               Text(
@@ -378,7 +382,8 @@ class _ProdutosContentState extends State<ProdutosContent>
                       : Padding(
                           padding: const EdgeInsets.all(16),
                           child: GridView.builder(
-                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
                               maxCrossAxisExtent: 250,
                               childAspectRatio: 0.75,
                               crossAxisSpacing: 16,
@@ -386,12 +391,14 @@ class _ProdutosContentState extends State<ProdutosContent>
                             ),
                             itemCount: filteredProdutos.length,
                             // Lazy loading: renderiza apenas os visíveis
-                            cacheExtent: 100, // Reduz cache para economizar memória
+                            cacheExtent:
+                                100, // Reduz cache para economizar memória
                             physics: const AlwaysScrollableScrollPhysics(),
                             itemBuilder: (context, index) {
                               final produto = filteredProdutos[index];
                               return _ProdutoCard(
-                                key: ValueKey(produto['id']), // Melhora performance com keys
+                                key: ValueKey(produto[
+                                    'id']), // Melhora performance com keys
                                 produto: produto,
                                 tamanhos: tamanhos,
                               );
@@ -409,7 +416,7 @@ class _ProdutoCard extends StatelessWidget {
   final Map<int, String> tamanhos;
 
   const _ProdutoCard({
-    super.key, 
+    super.key,
     required this.produto,
     required this.tamanhos,
   });
@@ -434,13 +441,13 @@ class _ProdutoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final categoria = produto['categorias'];
-    
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: colorScheme.outlineVariant.withValues(alpha:  0.3),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -465,18 +472,20 @@ class _ProdutoCard extends StatelessWidget {
                           return Icon(
                             _getIconForCategory(produto['tipo_produto']),
                             size: 48,
-                            color: colorScheme.onSurfaceVariant.withValues(alpha:  0.5),
+                            color: colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.5),
                           );
                         },
                       )
                     : Icon(
                         _getIconForCategory(produto['tipo_produto']),
                         size: 48,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha:  0.5),
+                        color:
+                            colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                       ),
               ),
             ),
-            
+
             // Detalhes
             Expanded(
               flex: 4,
@@ -497,13 +506,14 @@ class _ProdutoCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    
+
                     // Categoria
                     if (categoria != null)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: colorScheme.primary.withValues(alpha:  0.1),
+                          color: colorScheme.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -514,27 +524,52 @@ class _ProdutoCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                    
+
                     const Spacer(),
-                    
-                    // Preço - usando produtos_produtopreco
+
+                    // Preço - usando produtos_precos (única fonte agora)
                     Builder(builder: (context) {
-                      final precos = produto['produtos_produtopreco'] as List?;
-                      
+                      final precos = produto['produtos_precos'] as List?;
+
+                      // DEBUG: Verificar estrutura dos preços
+                      if (produto['nome'].toString().contains('Chocolate') ||
+                          produto['nome'].toString().contains('Nutella')) {
+                        print('🎯 Produto: ${produto['nome']}');
+                        print('   precos: $precos');
+                      }
+
                       if (precos != null && precos.isNotEmpty) {
                         // Se tem múltiplos tamanhos, mostrar todos os tamanhos com preços
                         if (precos.length > 1) {
                           // Ordenar por tamanho
                           final precosOrdenados = List.from(precos);
                           precosOrdenados.sort((a, b) {
-                            final tamanhoIdA = a['tamanho_id'] as int?;
-                            final tamanhoIdB = b['tamanho_id'] as int?;
-                            final tamanhoA = tamanhoIdA != null ? tamanhos[tamanhoIdA] ?? '' : '';
-                            final tamanhoB = tamanhoIdB != null ? tamanhos[tamanhoIdB] ?? '' : '';
-                            const ordem = ['P', 'M', 'G', 'GG'];
-                            return ordem.indexOf(tamanhoA).compareTo(ordem.indexOf(tamanhoB));
+                            String nomeA = a['produtos_tamanho']?['nome'] ?? '';
+                            String nomeB = b['produtos_tamanho']?['nome'] ?? '';
+                            int idx(String nome) {
+                              final n = nome.toString().toLowerCase();
+                              if (n.contains('broto') || n == 'p') {
+                                return 0;
+                              }
+                              if (n.contains('média') ||
+                                  n.contains('media') ||
+                                  n == 'm') {
+                                return 1;
+                              }
+                              if (n.contains('grande') || n == 'g') {
+                                return 2;
+                              }
+                              if (n.contains('família') ||
+                                  n.contains('familia') ||
+                                  n == 'gg') {
+                                return 3;
+                              }
+                              return 99;
+                            }
+
+                            return idx(nomeA).compareTo(idx(nomeB));
                           });
-                          
+
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -542,30 +577,23 @@ class _ProdutoCard extends StatelessWidget {
                                 spacing: 8,
                                 runSpacing: 4,
                                 children: precosOrdenados.map((p) {
-                                  final tamanhoId = p['tamanho_id'];
-                                  // DEBUG: tamanho_id=$tamanhoId (${tamanhoId.runtimeType}), tamanhos=$tamanhos
-                                  
-                                  String tamanho = '?';
-                                  if (tamanhoId != null) {
-                                    if (tamanhoId is int) {
-                                      tamanho = tamanhos[tamanhoId] ?? '?';
-                                    } else if (tamanhoId is String) {
-                                      final id = int.tryParse(tamanhoId);
-                                      if (id != null) {
-                                        tamanho = tamanhos[id] ?? '?';
-                                      }
-                                    } else {
-                                      // Tentar converter de qualquer forma
-                                      final id = int.tryParse(tamanhoId.toString());
-                                      if (id != null) {
-                                        tamanho = tamanhos[id] ?? '?';
-                                      }
-                                    }
-                                  }
-                                  
-                                  final preco = p['preco_promocional'] ?? p['preco'];
+                                  // Preferir nome direto do JOIN
+                                  String tamanho = p['produtos_tamanho']
+                                          ?['nome'] ??
+                                      tamanhos[(p['tamanho_id'] is int)
+                                          ? p['tamanho_id'] as int
+                                          : int.tryParse(
+                                                  p['tamanho_id']?.toString() ??
+                                                      '') ??
+                                              -1] ??
+                                      '?';
+
+                                  // Usar preco_promocional se disponível, senão preco
+                                  final preco =
+                                      p['preco_promocional'] ?? p['preco'];
                                   return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: colorScheme.primaryContainer,
                                       borderRadius: BorderRadius.circular(4),
@@ -585,9 +613,11 @@ class _ProdutoCard extends StatelessWidget {
                           );
                         } else {
                           // Um único preço
-                          final preco = precos[0]['preco_promocional'] ?? precos[0]['preco'];
+                          final preco = precos[0]['preco_promocional'] ??
+                              precos[0]['preco'];
                           final tamanhoId = precos[0]['tamanho_id'] as int?;
-                          final tamanho = tamanhoId != null ? tamanhos[tamanhoId] : null;
+                          final tamanho =
+                              tamanhoId != null ? tamanhos[tamanhoId] : null;
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -634,19 +664,19 @@ class _ProdutoCard extends StatelessWidget {
                         }
                       }
                     }),
-                    
+
                     const SizedBox(height: 4),
-                    
+
                     // Status
                     Row(
                       children: [
                         Icon(
-                          produto['ativo'] == true 
-                              ? Icons.check_circle 
+                          produto['ativo'] == true
+                              ? Icons.check_circle
                               : Icons.cancel,
                           size: 16,
-                          color: produto['ativo'] == true 
-                              ? Colors.green 
+                          color: produto['ativo'] == true
+                              ? Colors.green
                               : Colors.red,
                         ),
                         const SizedBox(width: 4),

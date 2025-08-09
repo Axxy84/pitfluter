@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'presentation/screens/produtos_screen.dart';
 import 'presentation/screens/novo_pedido_screen.dart';
 import 'presentation/screens/caixa_screen.dart';
 import 'presentation/screens/historico_caixas_screen.dart';
 import 'presentation/screens/lista_pedidos_screen.dart';
 import 'presentation/screens/mesas_abertas_screen.dart';
+import 'presentation/screens/inicial_screen.dart';
 import 'presentation/layouts/main_layout.dart';
 import 'core/constants/supabase_constants.dart';
 
@@ -50,37 +50,40 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-        title: 'Pizzaria Sistema',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFFDC2626), // Vermelho pizzaria
-          ),
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Color(0xFFDC2626),
-            foregroundColor: Colors.white,
-          ),
+      debugShowCheckedModeBanner: false, // Remove a tag DEBUG
+      title: 'Pizzaria Sistema',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFDC2626), // Vermelho pizzaria
         ),
-        initialRoute: '/',
-        routes: {
-          '/': (context) => const MainLayout(), // Usando MainLayout com sidebar fixa
-          '/pedidos': (context) => const ListaPedidosScreen(), // Usar a tela nova sem status
-          '/lista-pedidos': (context) => const ListaPedidosScreen(),
-          '/produtos': (context) => const ProdutosScreen(),
-          '/caixa': (context) => const CaixaScreen(),
-          '/historico-caixas': (context) => const HistoricoCaixasScreen(),
-          '/mesas-abertas': (context) => const MesasAbertasScreen(),
-        },
-        onGenerateRoute: (settings) {
-          if (settings.name == '/novo-pedido') {
-            return MaterialPageRoute(
-              builder: (context) => const NovoPedidoScreen(),
-              fullscreenDialog: true,
-            );
-          }
-          return null;
-        },
-      );
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFDC2626),
+          foregroundColor: Colors.white,
+        ),
+      ),
+      initialRoute: '/',
+      routes: {
+        '/': (context) =>
+            const InicialScreen(), // Tela inicial que verifica o caixa
+        '/main': (context) =>
+            const MainLayout(), // Layout principal após verificação
+        '/pedidos': (context) => const ListaPedidosScreen(),
+        '/lista-pedidos': (context) => const ListaPedidosScreen(),
+        // '/produtos': (context) => const ProdutosScreen(), // removida para evitar duplicidade
+        '/caixa': (context) => const CaixaScreen(),
+        '/historico-caixas': (context) => const HistoricoCaixasScreen(),
+        '/mesas-abertas': (context) => const MesasAbertasScreen(),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/novo-pedido') {
+          return MaterialPageRoute(
+            builder: (context) => const NovoPedidoScreen(),
+            fullscreenDialog: true,
+          );
+        }
+        return null;
+      },
+    );
   }
 }
-

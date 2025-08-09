@@ -13,17 +13,15 @@ abstract class CategoriaRemoteDataSource {
 
 class CategoriaRemoteDataSourceImpl implements CategoriaRemoteDataSource {
   final SupabaseClient supabaseClient;
-  static const String tableName = 'categoria';
+  static const String tableName = 'categorias';
 
   CategoriaRemoteDataSourceImpl({required this.supabaseClient});
 
   @override
   Future<List<CategoriaModel>> getCategorias() async {
     try {
-      final response = await supabaseClient
-          .from(tableName)
-          .select()
-          .order('ordem');
+      final response =
+          await supabaseClient.from(tableName).select().order('ordem');
 
       return response
           .map<CategoriaModel>((json) => CategoriaModel.fromJson(json))
@@ -38,11 +36,8 @@ class CategoriaRemoteDataSourceImpl implements CategoriaRemoteDataSource {
   @override
   Future<CategoriaModel> getCategoriaById(String id) async {
     try {
-      final response = await supabaseClient
-          .from(tableName)
-          .select()
-          .eq('id', id)
-          .single();
+      final response =
+          await supabaseClient.from(tableName).select().eq('id', id).single();
 
       return CategoriaModel.fromJson(response);
     } on PostgrestException catch (e) {
@@ -93,10 +88,7 @@ class CategoriaRemoteDataSourceImpl implements CategoriaRemoteDataSource {
   @override
   Future<void> deleteCategoria(String id) async {
     try {
-      await supabaseClient
-          .from(tableName)
-          .delete()
-          .eq('id', id);
+      await supabaseClient.from(tableName).delete().eq('id', id);
     } on PostgrestException catch (e) {
       throw ServerException(e.message);
     } catch (e) {

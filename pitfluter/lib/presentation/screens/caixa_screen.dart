@@ -1619,6 +1619,14 @@ class _CaixaScreenState extends State<CaixaScreen> {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.table_restaurant),
+            title: const Text('Mesas Abertas'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/mesas-abertas');
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.restaurant_menu),
             title: const Text('Produtos'),
             onTap: () {

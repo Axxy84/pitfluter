@@ -21,6 +21,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final CaixaService _caixaService = CaixaService();
   bool _caixaAberto = false;
+  bool _dialogJaMostrado = false;
   
   final supabase = Supabase.instance.client;
   
@@ -52,25 +53,88 @@ class _DashboardScreenState extends State<DashboardScreen>
     ));
     _animationController.forward();
     _carregarDadosReais();
-    _verificarCaixa();
+    
+    // Agendar verificação do caixa após o build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _verificarCaixa();
+    });
+    
+    // Alternativa: Agendar múltiplas verificações para garantir execução
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _verificarCaixa();
+    });
+    
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) _verificarCaixa();
+    });
   }
   
   Future<void> _verificarCaixa() async {
+    // Evitar mostrar dialog múltiplas vezes
+    if (_dialogJaMostrado) return;
+    
     try {
+      // DEBUG: ==========================================
+      // DEBUG: Verificando estado do caixa...
+      // DEBUG: Widget mounted: $mounted
+      
       final estado = await _caixaService.verificarEstadoCaixa();
-      setState(() {
-        _caixaAberto = estado.aberto;
-      });
+      // DEBUG: Caixa aberto: ${estado.aberto}
+      // DEBUG: Data abertura: ${estado.dataAbertura}
+      // DEBUG: ID do caixa: ${estado.id}
+      
+      if (mounted) {
+        setState(() {
+          _caixaAberto = estado.aberto;
+        });
+        // DEBUG: Estado atualizado no widget: $_caixaAberto
+      }
       
       // Se o caixa estiver fechado, mostrar dialog para abrir
       if (!estado.aberto && mounted) {
-        await Future.delayed(const Duration(milliseconds: 500));
+        // DEBUG: Caixa fechado, preparando para mostrar dialog...
+        // DEBUG: Aguardando 2 segundos para garantir que a tela esteja carregada...
+        
+        // Aguardar mais tempo para garantir que a tela esteja completamente carregada
+        await Future.delayed(const Duration(seconds: 2));
+        
         if (mounted) {
+          // DEBUG: Verificando se pode mostrar dialog...
+          // DEBUG: Context mounted: ${context.mounted}
+          
+          // Verificar se não há outro dialog já aberto
+          if (Navigator.canPop(context) == false || ModalRoute.of(context)?.isCurrent == true) {
+            // DEBUG: Exibindo dialog de abertura de caixa
+            _mostrarDialogAbrirCaixa();
+          } else {
+            // DEBUG: Não foi possível mostrar dialog - navegação não disponível
+          }
+        } else {
+          // DEBUG: Widget não montado, não mostrando dialog
+        }
+      } else if (estado.aberto) {
+        // DEBUG: Caixa já está aberto, não mostrando dialog
+      }
+      
+      // DEBUG: ==========================================
+      
+    } catch (e) {
+      // DEBUG: ❌ ERRO ao verificar caixa: $e
+      
+      // Se houver erro ao verificar, assumir que o caixa está fechado e mostrar dialog
+      if (mounted) {
+        setState(() {
+          _caixaAberto = false;
+        });
+        
+        // DEBUG: Erro na verificação, assumindo caixa fechado e tentando mostrar dialog...
+        await Future.delayed(const Duration(seconds: 2));
+        
+        if (mounted) {
+          // DEBUG: Mostrando dialog devido a erro na verificação
           _mostrarDialogAbrirCaixa();
         }
       }
-    } catch (e) {
-      // Erro ao verificar caixa
     }
   }
 
@@ -237,6 +301,19 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    
+    // DEBUG: Verificação adicional no build para garantir que o dialog apareça
+    if (!_caixaAberto) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // DEBUG: Build detectou caixa fechado, tentando mostrar dialog...
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted && !_caixaAberto) {
+            // DEBUG: Forçando exibição do dialog no build
+            _mostrarDialogAbrirCaixa();
+          }
+        });
+      });
+    }
 
     return Scaffold(
       key: _scaffoldKey,
@@ -279,6 +356,55 @@ class _DashboardScreenState extends State<DashboardScreen>
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
+          // Botão para forçar fechamento do caixa (DEBUG)
+          FloatingActionButton(
+            heroTag: 'closeCash',
+            onPressed: () async {
+              try {
+                // Forçar fechamento do caixa para teste
+                if (_caixaAberto) {
+                  await _caixaService.fecharCaixa();
+                  await _verificarCaixa();
+                  
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Caixa fechado! Recarregue a tela para testar o dialog automático'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Caixa já está fechado'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Erro: $e')),
+                );
+              }
+            },
+            backgroundColor: Colors.red,
+            mini: true,
+            child: const Icon(Icons.lock),
+          ),
+          const SizedBox(width: 8),
+          // Botão para forçar dialog (DEBUG)
+          FloatingActionButton(
+            heroTag: 'forceDialog',
+            onPressed: () {
+              // DEBUG: Botão de forçar dialog pressionado
+              _mostrarDialogAbrirCaixa();
+            },
+            backgroundColor: Colors.purple,
+            mini: true,
+            child: const Icon(Icons.warning),
+          ),
+          const SizedBox(width: 8),
           FloatingActionButton(
             heroTag: 'test',
             onPressed: () async {
@@ -353,31 +479,42 @@ class _DashboardScreenState extends State<DashboardScreen>
                 iconSize: 28,
               ),
               const Spacer(),
-              // Tag de status do caixa
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _caixaAberto ? Colors.green : Colors.orange,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _caixaAberto ? Icons.lock_open : Icons.lock,
-                      size: 16,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _caixaAberto ? 'Caixa Aberto' : 'Caixa Livre',
-                      style: const TextStyle(
+              // Tag de status do caixa - clicável
+              InkWell(
+                onTap: () {
+                  if (!_caixaAberto) {
+                    _mostrarDialogAbrirCaixa();
+                  } else {
+                    // Se já está aberto, navegar para tela de caixa
+                    Navigator.pushNamed(context, '/caixa');
+                  }
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _caixaAberto ? Colors.green : Colors.orange,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _caixaAberto ? Icons.lock_open : Icons.lock,
+                        size: 16,
                         color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      Text(
+                        _caixaAberto ? 'Caixa Aberto' : 'Caixa Livre',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -396,7 +533,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             dateString,
             style: TextStyle(
               fontSize: 16,
-              color: colorScheme.onSurface.withValues(alpha: 0.7),
+              color: colorScheme.onSurface.withValues(alpha:  0.7),
             ),
           ),
         ],
@@ -428,7 +565,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       HapticFeedback.selectionClick();
                     }
                   },
-                  selectedColor: const Color(0xFFDC2626).withValues(alpha: 0.1),
+                  selectedColor: const Color(0xFFDC2626).withValues(alpha:  0.1),
                   backgroundColor: colorScheme.surface,
                   labelStyle: TextStyle(
                     color: isSelected
@@ -470,7 +607,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildMetricCard(Map<String, dynamic> metric, ColorScheme colorScheme) {
     return Card(
       elevation: 4,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
+      shadowColor: Colors.black.withValues(alpha:  0.1),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
@@ -497,7 +634,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               metric['title'],
               style: TextStyle(
                 fontSize: 14,
-                color: colorScheme.onSurface.withValues(alpha: 0.7),
+                color: colorScheme.onSurface.withValues(alpha:  0.7),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -520,12 +657,15 @@ class _DashboardScreenState extends State<DashboardScreen>
                     color: metric['changeColor'],
                   ),
                   const SizedBox(width: 4),
-                  Text(
-                    metric['change'],
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: metric['changeColor'],
-                      fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Text(
+                      metric['change'],
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: metric['changeColor'],
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -557,7 +697,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildPieChart(ColorScheme colorScheme) {
     return Card(
       elevation: 4,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
+      shadowColor: Colors.black.withValues(alpha:  0.1),
       child: InkWell(
         onTap: () => _showChartDetails('Vendas por Categoria'),
         borderRadius: BorderRadius.circular(16),
@@ -595,7 +735,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildBarChart(ColorScheme colorScheme) {
     return Card(
       elevation: 4,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
+      shadowColor: Colors.black.withValues(alpha:  0.1),
       child: InkWell(
         onTap: () => _showChartDetails('Vendas Últimos 7 Dias'),
         borderRadius: BorderRadius.circular(16),
@@ -666,7 +806,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 item['label'] as String,
                 style: TextStyle(
                   fontSize: 12,
-                  color: colorScheme.onSurface.withValues(alpha: 0.7),
+                  color: colorScheme.onSurface.withValues(alpha:  0.7),
                 ),
               ),
               const Spacer(),
@@ -692,7 +832,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       margin: const EdgeInsets.all(24),
       child: Card(
         elevation: 4,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
+        shadowColor: Colors.black.withValues(alpha:  0.1),
         child: Container(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -724,7 +864,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: activity['color'].withValues(alpha: 0.1),
+              color: activity['color'].withValues(alpha:  0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
@@ -750,7 +890,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   activity['subtitle'],
                   style: TextStyle(
                     fontSize: 12,
-                    color: colorScheme.onSurface.withValues(alpha: 0.7),
+                    color: colorScheme.onSurface.withValues(alpha:  0.7),
                   ),
                 ),
               ],
@@ -760,7 +900,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             activity['time'],
             style: TextStyle(
               fontSize: 12,
-              color: colorScheme.onSurface.withValues(alpha: 0.5),
+              color: colorScheme.onSurface.withValues(alpha:  0.5),
             ),
           ),
         ],
@@ -937,6 +1077,14 @@ class _DashboardScreenState extends State<DashboardScreen>
             },
           ),
           ListTile(
+            leading: const Icon(Icons.table_restaurant),
+            title: const Text('Mesas Abertas'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/mesas-abertas');
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.restaurant_menu),
             title: const Text('Produtos'),
             onTap: () {
@@ -984,6 +1132,18 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
   
   void _mostrarDialogAbrirCaixa() {
+    // DEBUG: 🚀 Iniciando _mostrarDialogAbrirCaixa()
+    // DEBUG: Context mounted: ${context.mounted}
+    // DEBUG: Widget mounted: $mounted
+    
+    if (!mounted || !context.mounted) {
+      // DEBUG: ❌ Context ou widget não montado, cancelando dialog
+      return;
+    }
+    
+    // Marcar que o dialog foi mostrado
+    _dialogJaMostrado = true;
+    
     final valorController = TextEditingController();
     final observacoesController = TextEditingController();
     final nomeUsuarioController = TextEditingController();
@@ -997,10 +1157,14 @@ class _DashboardScreenState extends State<DashboardScreen>
       'Juliana',
     ];
     
+    // DEBUG: 💬 Chamando showDialog...
+    
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (BuildContext dialogContext) {
+        // DEBUG: ✅ Dialog builder executado!
+        return AlertDialog(
         title: Row(
           children: [
             const Icon(Icons.lock_open, color: Colors.green),
@@ -1143,8 +1307,15 @@ class _DashboardScreenState extends State<DashboardScreen>
             child: const Text('Abrir Agora'),
           ),
         ],
-      ),
-    );
+        );
+      },
+    ).then((value) {
+      // DEBUG: Dialog fechado com resultado: $value
+    }).catchError((error) {
+      // DEBUG: ❌ Erro no dialog: $error
+    });
+    
+    // DEBUG: ✅ showDialog executado
   }
 }
 
@@ -1238,7 +1409,7 @@ class BarChartPainter extends CustomPainter {
           end: Alignment.bottomCenter,
           colors: [
             const Color(0xFFDC2626),
-            const Color(0xFFDC2626).withValues(alpha: 0.7),
+            const Color(0xFFDC2626).withValues(alpha:  0.7),
           ],
         );
 

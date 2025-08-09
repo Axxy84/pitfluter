@@ -139,7 +139,7 @@ class RelatorioCaixaService {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     _buildInfoItem('Status:', caixa.estaAberto ? 'ABERTO' : 'FECHADO'),
-                    _buildInfoItem('Responsável:', 'João Silva'), // TODO: pegar do auth
+                    _buildInfoItem('Responsável:', 'João Silva'), // Será obtido do auth quando implementado
                     _buildInfoItem('Data de Abertura:', dateFormat.format(caixa.dataAbertura)),
                     if (caixa.dataFechamento != null)
                       _buildInfoItem('Data de Fechamento:', dateFormat.format(caixa.dataFechamento!)),

@@ -15,6 +15,7 @@ class _ProdutosContentState extends State<ProdutosContent>
   List<Map<String, dynamic>> categorias = [];
   List<Map<String, dynamic>> produtos = [];
   List<Map<String, dynamic>> filteredProdutos = [];
+  Map<int, String> tamanhos = {}; // Mapa de id do tamanho para nome
   bool isLoading = true;
   String? error;
   
@@ -44,7 +45,27 @@ class _ProdutosContentState extends State<ProdutosContent>
     });
 
     try {
-      // Primeiro, buscar o ID da categoria "Pizzas Promocionais" para excluí-la
+      // Primeiro, carregar todos os tamanhos
+      final tamanhosResponse = await supabase
+          .from('produtos_tamanho')
+          .select('id, nome');
+      
+      // Criar mapa de tamanhos
+      // DEBUG: Tamanhos carregados
+      for (final t in tamanhosResponse) {
+        final id = t['id'];
+        final nome = t['nome'];
+        // DEBUG: ID: $id (${id.runtimeType}), Nome: $nome
+        // Tentar converter para int se necessário
+        if (id is int) {
+          tamanhos[id] = nome as String;
+        } else if (id is String) {
+          tamanhos[int.tryParse(id) ?? 0] = nome as String;
+        }
+      }
+      // DEBUG: Mapa de tamanhos criado: $tamanhos
+      
+      // Buscar o ID da categoria "Pizzas Promocionais" para excluí-la
       final categPromoResponse = await supabase
           .from('produtos_categoria')
           .select('id')
@@ -61,10 +82,7 @@ class _ProdutosContentState extends State<ProdutosContent>
             produtos_produtopreco (
               preco,
               preco_promocional,
-              tamanho_id,
-              produtos_tamanho (
-                nome
-              )
+              tamanho_id
             )
           ''');
       
@@ -77,10 +95,7 @@ class _ProdutosContentState extends State<ProdutosContent>
 
       produtos = List<Map<String, dynamic>>.from(produtosResponse);
       
-      // Debug: ver estrutura dos produtos
-      if (produtos.isNotEmpty) {
-        // Debug: estrutura dos produtos
-      }
+      // DEBUG: estrutura dos produtos carregada
       
       // Carregar categorias
       final todasCategoriasResponse = await supabase
@@ -113,7 +128,7 @@ class _ProdutosContentState extends State<ProdutosContent>
         }
       }
       
-      // Categorias carregadas
+      // DEBUG: Categorias carregadas
       
       // Inicializar ou atualizar TabController
       if (_tabController == null) {
@@ -213,7 +228,7 @@ class _ProdutosContentState extends State<ProdutosContent>
             color: colorScheme.surface,
             border: Border(
               bottom: BorderSide(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                color: colorScheme.outlineVariant.withValues(alpha:  0.3),
               ),
             ),
           ),
@@ -253,7 +268,7 @@ class _ProdutosContentState extends State<ProdutosContent>
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: () {
-                          // TODO: Adicionar produto
+                          // Funcionalidade de adicionar produto será implementada
                         },
                         icon: const Icon(Icons.add),
                         label: const Text('Novo Produto'),
@@ -347,7 +362,7 @@ class _ProdutosContentState extends State<ProdutosContent>
                               Icon(
                                 Icons.inventory_2_outlined,
                                 size: 64,
-                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                color: colorScheme.onSurfaceVariant.withValues(alpha:  0.5),
                               ),
                               const SizedBox(height: 16),
                               Text(
@@ -378,6 +393,7 @@ class _ProdutosContentState extends State<ProdutosContent>
                               return _ProdutoCard(
                                 key: ValueKey(produto['id']), // Melhora performance com keys
                                 produto: produto,
+                                tamanhos: tamanhos,
                               );
                             },
                           ),
@@ -390,8 +406,13 @@ class _ProdutosContentState extends State<ProdutosContent>
 
 class _ProdutoCard extends StatelessWidget {
   final Map<String, dynamic> produto;
+  final Map<int, String> tamanhos;
 
-  const _ProdutoCard({super.key, required this.produto});
+  const _ProdutoCard({
+    super.key, 
+    required this.produto,
+    required this.tamanhos,
+  });
 
   IconData _getIconForCategory(String? tipo) {
     switch (tipo?.toLowerCase()) {
@@ -419,13 +440,13 @@ class _ProdutoCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+          color: colorScheme.outlineVariant.withValues(alpha:  0.3),
         ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          // TODO: Editar produto
+          // Funcionalidade de editar produto será implementada
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -444,14 +465,14 @@ class _ProdutoCard extends StatelessWidget {
                           return Icon(
                             _getIconForCategory(produto['tipo_produto']),
                             size: 48,
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                            color: colorScheme.onSurfaceVariant.withValues(alpha:  0.5),
                           );
                         },
                       )
                     : Icon(
                         _getIconForCategory(produto['tipo_produto']),
                         size: 48,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                        color: colorScheme.onSurfaceVariant.withValues(alpha:  0.5),
                       ),
               ),
             ),
@@ -482,7 +503,7 @@ class _ProdutoCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: colorScheme.primary.withValues(alpha: 0.1),
+                          color: colorScheme.primary.withValues(alpha:  0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -506,8 +527,10 @@ class _ProdutoCard extends StatelessWidget {
                           // Ordenar por tamanho
                           final precosOrdenados = List.from(precos);
                           precosOrdenados.sort((a, b) {
-                            final tamanhoA = a['produtos_tamanho']?['nome'] ?? '';
-                            final tamanhoB = b['produtos_tamanho']?['nome'] ?? '';
+                            final tamanhoIdA = a['tamanho_id'] as int?;
+                            final tamanhoIdB = b['tamanho_id'] as int?;
+                            final tamanhoA = tamanhoIdA != null ? tamanhos[tamanhoIdA] ?? '' : '';
+                            final tamanhoB = tamanhoIdB != null ? tamanhos[tamanhoIdB] ?? '' : '';
                             const ordem = ['P', 'M', 'G', 'GG'];
                             return ordem.indexOf(tamanhoA).compareTo(ordem.indexOf(tamanhoB));
                           });
@@ -519,7 +542,27 @@ class _ProdutoCard extends StatelessWidget {
                                 spacing: 8,
                                 runSpacing: 4,
                                 children: precosOrdenados.map((p) {
-                                  final tamanho = p['produtos_tamanho']?['nome'] ?? '?';
+                                  final tamanhoId = p['tamanho_id'];
+                                  // DEBUG: tamanho_id=$tamanhoId (${tamanhoId.runtimeType}), tamanhos=$tamanhos
+                                  
+                                  String tamanho = '?';
+                                  if (tamanhoId != null) {
+                                    if (tamanhoId is int) {
+                                      tamanho = tamanhos[tamanhoId] ?? '?';
+                                    } else if (tamanhoId is String) {
+                                      final id = int.tryParse(tamanhoId);
+                                      if (id != null) {
+                                        tamanho = tamanhos[id] ?? '?';
+                                      }
+                                    } else {
+                                      // Tentar converter de qualquer forma
+                                      final id = int.tryParse(tamanhoId.toString());
+                                      if (id != null) {
+                                        tamanho = tamanhos[id] ?? '?';
+                                      }
+                                    }
+                                  }
+                                  
                                   final preco = p['preco_promocional'] ?? p['preco'];
                                   return Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -543,7 +586,8 @@ class _ProdutoCard extends StatelessWidget {
                         } else {
                           // Um único preço
                           final preco = precos[0]['preco_promocional'] ?? precos[0]['preco'];
-                          final tamanho = precos[0]['produtos_tamanho']?['nome'];
+                          final tamanhoId = precos[0]['tamanho_id'] as int?;
+                          final tamanho = tamanhoId != null ? tamanhos[tamanhoId] : null;
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

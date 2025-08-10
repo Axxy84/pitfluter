@@ -20,9 +20,10 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   final TextEditingController _nomeGarcomController = TextEditingController();
   final TextEditingController _observacoesController = TextEditingController();
   final TextEditingController _buscaProdutoController = TextEditingController();
-  final TextEditingController _taxaEntregaController = TextEditingController(text: '2.00');
+  final TextEditingController _taxaEntregaController =
+      TextEditingController(text: '2.00');
   final Map<int, TextEditingController> _observacoesItemControllers = {};
-  
+
   String _tipoPedido = 'delivery';
   String? _produtoSelecionado;
   String _tamanhoSelecionado = 'M';
@@ -31,19 +32,19 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   String? _sabor2;
   int _quantidade = 1;
   int _mesaSelecionada = 1;
-  
+
   // Variáveis para forma de pagamento
   String _formaPagamento = 'dinheiro';
   final TextEditingController _valorPagoController = TextEditingController();
   double _troco = 0.0;
-  
+
   final List<Map<String, dynamic>> _carrinho = [];
   double _subtotal = 0.0;
   double _taxaEntregaEditavel = 2.0;
   String _filtroTexto = '';
   bool _carregandoProdutos = false;
   List<Map<String, dynamic>> _produtosBanco = [];
-  
+
   final Map<String, double> _multiplicadorTamanho = {
     'P': 0.8,
     'M': 1.0,
@@ -64,11 +65,11 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     {'nome': 'Água', 'preco': 4.0, 'imagem': '💧'},
   ];
 
-
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // Pizzas, Bebidas, Bordas
+    _tabController =
+        TabController(length: 3, vsync: this); // Pizzas, Bebidas, Bordas
     _carregarProdutos();
   }
 
@@ -92,51 +93,48 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     setState(() {
       _carregandoProdutos = true;
     });
-    
+
     try {
       // Diagnóstico comentado - muito verboso
       // await DatabaseDiagnostic.runDiagnostic();
-      
+
       final supabase = Supabase.instance.client;
-      
+
       // Usar a MESMA query que funciona na tela de produtos!
-      
+
       // Query para produtos - mesma que funciona na tela de produtos
-      final produtosResponse = await supabase
-          .from('produtos_produto')
-          .select('''
+      final produtosResponse = await supabase.from('produtos').select('''
             *,
-            produtos_produtopreco (
+            produtos_precos (
               preco,
               preco_promocional,
               tamanho_id,
-              produtos_tamanho (
+              tamanhos (
                 nome
               )
             ),
-            produtos_categoria (
+            categorias (
               id,
               nome
             )
-          ''')
-          .eq('ativo', true)
-          .order('nome');
-      
-      
+          ''').eq('ativo', true).order('nome');
+
       setState(() {
         _produtosBanco = produtosResponse.map((produto) {
-          // Usar produtos_categoria ao invés de categorias
-          final categoria = produto['produtos_categoria'];
+          // Usar categorias ao invés de produtos_categoria
+          final categoria = produto['categorias'];
           final categoriaNome = categoria?['nome'] ?? 'Outros';
-          
+
           // Extrair preço dos preços relacionados
           double precoBase = 40.0; // Preço padrão das pizzas promocionais
-          final precos = produto['produtos_produtopreco'] as List?;
+          final precos = produto['produtos_precos'] as List?;
           if (precos != null && precos.isNotEmpty) {
             // Pegar o preço promocional se existir, senão o preço normal
-            precoBase = (precos[0]['preco_promocional'] ?? precos[0]['preco'] ?? 40.0).toDouble();
+            precoBase =
+                (precos[0]['preco_promocional'] ?? precos[0]['preco'] ?? 40.0)
+                    .toDouble();
           }
-          
+
           return {
             'id': produto['id'],
             'nome': produto['nome'] as String,
@@ -151,20 +149,19 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         }).toList();
         _carregandoProdutos = false;
       });
-      
-      
     } catch (e) {
       if (mounted) {
         setState(() {
           _carregandoProdutos = false;
         });
       }
-      
+
       // Mostrar erro e usar dados mockados como fallback
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erro ao carregar produtos: $e\nUsando dados de exemplo.'),
+            content:
+                Text('Erro ao carregar produtos: $e\nUsando dados de exemplo.'),
             backgroundColor: Colors.orange,
             duration: const Duration(seconds: 5),
           ),
@@ -177,7 +174,10 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     final cat = categoria.toLowerCase();
     if (cat.contains('pizza')) {
       return '🍕';
-    } else if (cat.contains('bebida') || cat.contains('drink') || cat.contains('cerveja') || cat.contains('refrigerante')) {
+    } else if (cat.contains('bebida') ||
+        cat.contains('drink') ||
+        cat.contains('cerveja') ||
+        cat.contains('refrigerante')) {
       return '🥤';
     } else if (cat.contains('borda')) {
       return '🧀';
@@ -190,7 +190,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
 
   List<Map<String, dynamic>> get _produtosAtuais {
     List<Map<String, dynamic>> produtos;
-    
+
     if (_produtosBanco.isNotEmpty) {
       // Usar produtos do banco de dados com mesma lógica da tela produtos
       switch (_tabController.index) {
@@ -200,15 +200,19 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             final categoria = p['categoriaNome'].toString().toLowerCase();
             final tipoProduto = p['tipoProduto'].toString().toLowerCase();
             final nomeProduto = p['nome'].toString().toLowerCase();
-            
+
             // Palavras-chave para pizzas (mesmo critério da tela produtos)
-            final palavrasChavePizza = ['pizza', 'pizzas especiais', 'pizzas salgadas', 'pizzas doces'];
-            
-            return palavrasChavePizza.any((palavra) => 
-              categoria.contains(palavra.toLowerCase()) ||
-              tipoProduto.contains(palavra.toLowerCase()) ||
-              nomeProduto.contains('pizza')
-            );
+            final palavrasChavePizza = [
+              'pizza',
+              'pizzas especiais',
+              'pizzas salgadas',
+              'pizzas doces'
+            ];
+
+            return palavrasChavePizza.any((palavra) =>
+                categoria.contains(palavra.toLowerCase()) ||
+                tipoProduto.contains(palavra.toLowerCase()) ||
+                nomeProduto.contains('pizza'));
           }).toList();
           break;
         case 1:
@@ -217,15 +221,23 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             final categoria = p['categoriaNome'].toString().toLowerCase();
             final tipoProduto = p['tipoProduto'].toString().toLowerCase();
             final nomeProduto = p['nome'].toString().toLowerCase();
-            
+
             // Palavras-chave para bebidas (mesmo critério da tela produtos)
-            final palavrasChaveBebida = ['bebida', 'bebidas', 'drink', 'drinks', 'cerveja', 'cervejas', 'refrigerante', 'suco'];
-            
-            return palavrasChaveBebida.any((palavra) => 
-              categoria.contains(palavra.toLowerCase()) ||
-              tipoProduto.contains(palavra.toLowerCase()) ||
-              nomeProduto.contains(palavra.toLowerCase())
-            );
+            final palavrasChaveBebida = [
+              'bebida',
+              'bebidas',
+              'drink',
+              'drinks',
+              'cerveja',
+              'cervejas',
+              'refrigerante',
+              'suco'
+            ];
+
+            return palavrasChaveBebida.any((palavra) =>
+                categoria.contains(palavra.toLowerCase()) ||
+                tipoProduto.contains(palavra.toLowerCase()) ||
+                nomeProduto.contains(palavra.toLowerCase()));
           }).toList();
           break;
         case 2:
@@ -234,15 +246,14 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             final categoria = p['categoriaNome'].toString().toLowerCase();
             final tipoProduto = p['tipoProduto'].toString().toLowerCase();
             final nomeProduto = p['nome'].toString().toLowerCase();
-            
+
             // Palavras-chave para bordas (mesmo critério da tela produtos)
             final palavrasChaveBorda = ['borda', 'bordas', 'bordas recheadas'];
-            
-            return palavrasChaveBorda.any((palavra) => 
-              categoria.contains(palavra.toLowerCase()) ||
-              tipoProduto.contains(palavra.toLowerCase()) ||
-              nomeProduto.contains('borda')
-            );
+
+            return palavrasChaveBorda.any((palavra) =>
+                categoria.contains(palavra.toLowerCase()) ||
+                tipoProduto.contains(palavra.toLowerCase()) ||
+                nomeProduto.contains('borda'));
           }).toList();
           break;
         default:
@@ -268,19 +279,21 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           produtos = _pizzas;
       }
     }
-    
+
     // Filtrar produtos se houver texto de busca
     if (_filtroTexto.isNotEmpty) {
       return produtos.where((produto) {
-        return produto['nome'].toLowerCase().contains(_filtroTexto.toLowerCase());
+        return produto['nome']
+            .toLowerCase()
+            .contains(_filtroTexto.toLowerCase());
       }).toList();
     }
-    
+
     return produtos;
   }
 
   bool get _isPizza => _tabController.index == 0;
-  
+
   double get _taxaEntrega {
     switch (_tipoPedido) {
       case 'delivery':
@@ -291,7 +304,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         return 0.0;
     }
   }
-  
+
   String get _tempoEstimado {
     switch (_tipoPedido) {
       case 'delivery':
@@ -304,7 +317,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         return '30 min';
     }
   }
-  
+
   String _getTipoTaxaLabel() {
     switch (_tipoPedido) {
       case 'delivery':
@@ -316,70 +329,75 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
 
   List<String> _getTamanhosDisponiveis() {
     if (_produtoSelecionado == null) return ['P', 'M', 'G', 'F'];
-    
+
     // Verificar se é pizza delivery
     final produtos = _produtosAtuais;
-    final produto = produtos.where((p) => p['nome'] == _produtoSelecionado).firstOrNull;
+    final produto =
+        produtos.where((p) => p['nome'] == _produtoSelecionado).firstOrNull;
     if (produto != null) {
       final categoriaNome = produto['categoriaNome'] ?? '';
       final isPizzaDelivery = categoriaNome.toLowerCase().contains('delivery');
-      
+
       if (isPizzaDelivery) {
         // Pizza Delivery só tem tamanho médio
         return ['M'];
       }
     }
-    
+
     // Outras pizzas têm todos os tamanhos
     return ['P', 'M', 'G', 'F'];
   }
 
   double _calcularPreco() {
     if (_produtoSelecionado == null) return 0.0;
-    
+
     final produtos = _produtosAtuais;
-    final produto = produtos.where((p) => p['nome'] == _produtoSelecionado).firstOrNull;
+    final produto =
+        produtos.where((p) => p['nome'] == _produtoSelecionado).firstOrNull;
     if (produto == null) return 0.0;
-    
+
     double precoBase1 = (produto['preco'] as num).toDouble();
-    
+
     if (_isPizza) {
       // Verificar se é pizza delivery (R$ 40,00 apenas para tamanho médio)
       final categoriaNome = produto['categoriaNome'] ?? '';
       final isPizzaDelivery = categoriaNome.toLowerCase().contains('delivery');
-      
+
       if (isPizzaDelivery) {
         // Pizza Delivery SEMPRE R$ 40,00 (só tem tamanho médio disponível)
         return 40.0 * _quantidade;
       } else {
         // Aplicar multiplicador de tamanho para outras pizzas
-        double preco1 = precoBase1 * _multiplicadorTamanho[_tamanhoSelecionado]!;
-        
+        double preco1 =
+            precoBase1 * _multiplicadorTamanho[_tamanhoSelecionado]!;
+
         if (_doisSabores && _sabor2 != null && _sabor2!.isNotEmpty) {
-          final produto2 = produtos.where((p) => p['nome'] == _sabor2).firstOrNull;
+          final produto2 =
+              produtos.where((p) => p['nome'] == _sabor2).firstOrNull;
           if (produto2 != null) {
             double precoBase2 = (produto2['preco'] as num).toDouble();
-            double preco2 = precoBase2 * _multiplicadorTamanho[_tamanhoSelecionado]!;
-            
+            double preco2 =
+                precoBase2 * _multiplicadorTamanho[_tamanhoSelecionado]!;
+
             // SEMPRE pegar o MAIOR preço entre os 2 sabores
             double precoFinal = preco1 > preco2 ? preco1 : preco2;
-            
+
             return precoFinal * _quantidade;
           }
         }
-        
+
         return preco1 * _quantidade;
       }
     }
-    
+
     return precoBase1 * _quantidade;
   }
 
   void _adicionarAoCarrinho() {
     if (_produtoSelecionado == null) return;
-    
+
     HapticFeedback.lightImpact();
-    
+
     String descricao = _produtoSelecionado!;
     if (_isPizza) {
       descricao += ' $_tamanhoSelecionado';
@@ -387,7 +405,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         descricao += ' (½ $_produtoSelecionado + ½ $_sabor2)';
       }
     }
-    
+
     final item = {
       'nome': _produtoSelecionado!,
       'descricao': descricao,
@@ -396,7 +414,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       'total': _calcularPreco(),
       'observacao': '', // Campo para observações do item
     };
-    
+
     setState(() {
       _carrinho.add(item);
       _calcularSubtotal();
@@ -436,7 +454,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       });
       _observacoesItemControllers.clear();
       _observacoesItemControllers.addAll(novosControllers);
-      
+
       _carrinho.removeAt(index);
       _calcularSubtotal();
     });
@@ -447,7 +465,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       _removerDoCarrinho(index);
       return;
     }
-    
+
     setState(() {
       _carrinho[index]['quantidade'] = novaQuantidade;
       _carrinho[index]['total'] = _carrinho[index]['preco'] * novaQuantidade;
@@ -458,25 +476,25 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   /// Prepara dados do pedido para impressão
   Map<String, dynamic> _prepararDadosPedido() {
     final agora = DateTime.now();
-    final numeroPedido = '${agora.millisecondsSinceEpoch}'.substring(7); // Últimos 6 dígitos
-    
+    final numeroPedido =
+        '${agora.millisecondsSinceEpoch}'.substring(7); // Últimos 6 dígitos
+
     return {
       'numeroPedido': numeroPedido.padLeft(6, '0'),
       'dataPedido': agora,
-      'nomeCliente': _clienteController.text.trim().isEmpty 
-          ? 'Cliente não informado' 
+      'nomeCliente': _clienteController.text.trim().isEmpty
+          ? 'Cliente não informado'
           : _clienteController.text.trim(),
       'telefoneCliente': null, // Adicionar campo se necessário
-      'enderecoCliente': _tipoPedido == 'delivery' 
-          ? _enderecoController.text.trim() 
-          : null,
+      'enderecoCliente':
+          _tipoPedido == 'delivery' ? _enderecoController.text.trim() : null,
       'itens': _carrinho,
       'subtotal': _subtotal,
       'taxaEntrega': _taxaEntrega,
       'total': _subtotal + _taxaEntrega,
       'formaPagamento': 'A definir', // Adicionar seleção se necessário
-      'observacoesPedido': _observacoesController.text.trim().isEmpty 
-          ? null 
+      'observacoesPedido': _observacoesController.text.trim().isEmpty
+          ? null
           : _observacoesController.text.trim(),
     };
   }
@@ -514,10 +532,10 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
 
       // Preparar dados
       final dados = _prepararDadosPedido();
-      
+
       if (!mounted) return;
       Navigator.of(context).pop(); // Fechar loading
-      
+
       // Imprimir
       final sucesso = await ImpressaoService.imprimirComanda(
         numeroPedido: dados['numeroPedido'],
@@ -532,7 +550,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         formaPagamento: dados['formaPagamento'],
         observacoesPedido: dados['observacoesPedido'],
       );
-      
+
       if (!mounted) return;
       if (sucesso) {
         HapticFeedback.lightImpact();
@@ -550,7 +568,6 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           ),
         );
       }
-      
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context).pop(); // Fechar loading se estiver aberto
@@ -613,7 +630,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             onPressed: () async {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Executando diagnóstico... Verifique o console'),
+                  content:
+                      Text('Executando diagnóstico... Verifique o console'),
                   duration: Duration(seconds: 2),
                 ),
               );
@@ -823,16 +841,19 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                     children: [
                       const Text(
                         '🪑 Mesa',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 4),
                       DropdownButtonFormField<int>(
                         value: _mesaSelecionada,
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding:
+                              EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                        items: List.generate(10, (index) => index + 1).map((mesa) {
+                        items:
+                            List.generate(10, (index) => index + 1).map((mesa) {
                           return DropdownMenuItem<int>(
                             value: mesa,
                             child: Text('Mesa $mesa'),
@@ -909,7 +930,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           decoration: InputDecoration(
             hintText: hint,
             border: const OutlineInputBorder(),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             focusedBorder: OutlineInputBorder(
               borderSide: BorderSide(color: Colors.red.shade400),
             ),
@@ -955,7 +977,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                 ),
                 filled: true,
                 fillColor: const Color(0xFFF5F5F5),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 suffixIcon: _filtroTexto.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear, size: 20),
@@ -986,16 +1009,21 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  _produtosBanco.isNotEmpty ? Icons.cloud_done : Icons.cloud_off,
-                  size: 16, 
-                  color: _produtosBanco.isNotEmpty ? Colors.green : Colors.orange,
+                  _produtosBanco.isNotEmpty
+                      ? Icons.cloud_done
+                      : Icons.cloud_off,
+                  size: 16,
+                  color:
+                      _produtosBanco.isNotEmpty ? Colors.green : Colors.orange,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   '${_produtosAtuais.length} items ${_produtosBanco.isNotEmpty ? '(DB)' : '(Mock)'}',
                   style: TextStyle(
                     fontSize: 12,
-                    color: _produtosBanco.isNotEmpty ? Colors.green : Colors.orange,
+                    color: _produtosBanco.isNotEmpty
+                        ? Colors.green
+                        : Colors.orange,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -1027,9 +1055,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         ),
       );
     }
-    
+
     final produtos = _produtosAtuais;
-    
+
     if (produtos.isEmpty) {
       return Center(
         child: Column(
@@ -1051,7 +1079,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              _produtosBanco.isEmpty 
+              _produtosBanco.isEmpty
                   ? 'Erro ao carregar do banco de dados'
                   : 'Tente buscar por outro termo',
               style: TextStyle(
@@ -1070,7 +1098,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         ),
       );
     }
-    
+
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -1083,7 +1111,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       itemBuilder: (context, index) {
         final produto = produtos[index];
         final isSelected = _produtoSelecionado == produto['nome'];
-        
+
         return GestureDetector(
           onTap: () {
             HapticFeedback.selectionClick();
@@ -1091,10 +1119,11 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               _produtoSelecionado = produto['nome'];
               if (_isPizza) {
                 _sabor1 = produto['nome'];
-                
+
                 // Se for Pizza Delivery, forçar tamanho médio
                 final categoriaNome = produto['categoriaNome'] ?? '';
-                final isPizzaDelivery = categoriaNome.toLowerCase().contains('delivery');
+                final isPizzaDelivery =
+                    categoriaNome.toLowerCase().contains('delivery');
                 if (isPizzaDelivery) {
                   _tamanhoSelecionado = 'M';
                 }
@@ -1104,7 +1133,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
-              color: isSelected ? Colors.red.withValues(alpha: 0.08) : Colors.white,
+              color: isSelected
+                  ? Colors.red.withValues(alpha: 0.08)
+                  : Colors.white,
               border: Border.all(
                 color: isSelected ? Colors.red : Colors.grey.shade200,
                 width: isSelected ? 2.5 : 1,
@@ -1133,7 +1164,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                 children: [
                   Text(
                     produto['imagem'],
-                    style: const TextStyle(fontSize: 32), // Reduzido de 48 para 32
+                    style:
+                        const TextStyle(fontSize: 32), // Reduzido de 48 para 32
                   ),
                   const SizedBox(height: 6), // Reduzido de 8 para 6
                   Text(
@@ -1147,10 +1179,14 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                     overflow: TextOverflow.ellipsis,
                   ),
                   // Tag Pizza Promocional para Pizza Delivery
-                  if (produto['categoriaNome']?.toLowerCase()?.contains('delivery') == true) ...[
+                  if (produto['categoriaNome']
+                          ?.toLowerCase()
+                          ?.contains('delivery') ==
+                      true) ...[
                     const SizedBox(height: 2),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.orange,
                         borderRadius: BorderRadius.circular(8),
@@ -1303,19 +1339,23 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
 
   Widget _buildSeletorSabores() {
     // Pegar apenas as pizzas disponíveis
-    final pizzasDisponiveis = _produtosBanco.isNotEmpty 
+    final pizzasDisponiveis = _produtosBanco.isNotEmpty
         ? _produtosBanco.where((p) {
             final categoria = p['categoriaNome'].toString().toLowerCase();
             final tipoProduto = p['tipoProduto'].toString().toLowerCase();
             final nomeProduto = p['nome'].toString().toLowerCase();
-            
-            final palavrasChavePizza = ['pizza', 'pizzas especiais', 'pizzas salgadas', 'pizzas doces'];
-            
-            return palavrasChavePizza.any((palavra) => 
-              categoria.contains(palavra.toLowerCase()) ||
-              tipoProduto.contains(palavra.toLowerCase()) ||
-              nomeProduto.contains('pizza')
-            );
+
+            final palavrasChavePizza = [
+              'pizza',
+              'pizzas especiais',
+              'pizzas salgadas',
+              'pizzas doces'
+            ];
+
+            return palavrasChavePizza.any((palavra) =>
+                categoria.contains(palavra.toLowerCase()) ||
+                tipoProduto.contains(palavra.toLowerCase()) ||
+                nomeProduto.contains('pizza'));
           }).toList()
         : _pizzas;
 
@@ -1332,7 +1372,11 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     );
   }
 
-  Widget _buildDropdownSabor(String label, String? valor, List<Map<String, dynamic>> pizzasDisponiveis, Function(String?) onChanged) {
+  Widget _buildDropdownSabor(
+      String label,
+      String? valor,
+      List<Map<String, dynamic>> pizzasDisponiveis,
+      Function(String?) onChanged) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1387,9 +1431,10 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     );
   }
 
-  void _showSearchablePizzaDialog(List<Map<String, dynamic>> pizzas, Function(String?) onChanged, String? currentValue) {
+  void _showSearchablePizzaDialog(List<Map<String, dynamic>> pizzas,
+      Function(String?) onChanged, String? currentValue) {
     String filtro = '';
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -1397,12 +1442,16 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           builder: (context, setDialogState) {
             final pizzasFiltradas = filtro.isEmpty
                 ? pizzas
-                : pizzas.where((p) => 
-                    p['nome'].toString().toLowerCase().contains(filtro.toLowerCase())
-                  ).toList();
+                : pizzas
+                    .where((p) => p['nome']
+                        .toString()
+                        .toLowerCase()
+                        .contains(filtro.toLowerCase()))
+                    .toList();
 
             return AlertDialog(
-              title: const Text('Selecionar Pizza', style: TextStyle(fontSize: 16)),
+              title: const Text('Selecionar Pizza',
+                  style: TextStyle(fontSize: 16)),
               contentPadding: const EdgeInsets.all(16),
               content: SizedBox(
                 width: 300,
@@ -1414,7 +1463,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                       decoration: const InputDecoration(
                         hintText: '🔍 Buscar pizza...',
                         border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         isDense: true,
                       ),
                       onChanged: (value) {
@@ -1424,7 +1474,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                       },
                     ),
                     const SizedBox(height: 12),
-                    
+
                     // Lista de pizzas
                     Expanded(
                       child: pizzasFiltradas.isEmpty
@@ -1438,8 +1488,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                               itemCount: pizzasFiltradas.length,
                               itemBuilder: (context, index) {
                                 final pizza = pizzasFiltradas[index];
-                                final isSelected = currentValue == pizza['nome'];
-                                
+                                final isSelected =
+                                    currentValue == pizza['nome'];
+
                                 return ListTile(
                                   dense: true,
                                   leading: Text(
@@ -1450,16 +1501,21 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                                     pizza['nome'],
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                      color: isSelected ? Colors.red : Colors.black,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                      color: isSelected
+                                          ? Colors.red
+                                          : Colors.black,
                                     ),
                                   ),
                                   subtitle: Text(
                                     'R\$ ${pizza['preco'].toStringAsFixed(2)}',
                                     style: const TextStyle(fontSize: 12),
                                   ),
-                                  trailing: isSelected 
-                                      ? const Icon(Icons.check_circle, color: Colors.red, size: 20)
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check_circle,
+                                          color: Colors.red, size: 20)
                                       : null,
                                   onTap: () {
                                     onChanged(pizza['nome']);
@@ -1521,7 +1577,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               ),
               child: Text(
                 _quantidade.toString(),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
             ),
             IconButton(
@@ -1547,8 +1604,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   }
 
   Widget _buildBotaoAdicionar() {
-    final canAdd = _produtoSelecionado != null && (!_doisSabores || _sabor2 != null);
-    
+    final canAdd =
+        _produtoSelecionado != null && (!_doisSabores || _sabor2 != null);
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
@@ -1693,12 +1751,14 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           Row(
             children: [
               IconButton(
-                onPressed: () => _alterarQuantidadeCarrinho(index, item['quantidade'] - 1),
+                onPressed: () =>
+                    _alterarQuantidadeCarrinho(index, item['quantidade'] - 1),
                 icon: const Icon(Icons.remove, size: 16),
               ),
               Text(item['quantidade'].toString()),
               IconButton(
-                onPressed: () => _alterarQuantidadeCarrinho(index, item['quantidade'] + 1),
+                onPressed: () =>
+                    _alterarQuantidadeCarrinho(index, item['quantidade'] + 1),
                 icon: const Icon(Icons.add, size: 16),
               ),
               const Spacer(),
@@ -1720,7 +1780,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   Widget _buildRodapeCarrinho() {
     final taxaAtual = _taxaEntrega;
     final total = _subtotal + taxaAtual;
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
@@ -1747,7 +1807,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                   width: 100,
                   child: TextFormField(
                     controller: _taxaEntregaController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     textAlign: TextAlign.right,
                     style: const TextStyle(
                       fontSize: 14,
@@ -1756,7 +1817,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                     decoration: InputDecoration(
                       prefixText: 'R\$ ',
                       isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -1797,14 +1859,14 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Forma de Pagamento
           const Text(
             'Forma de Pagamento:',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          
+
           // Opções de pagamento em linha
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
@@ -1818,7 +1880,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               ],
             ),
           ),
-          
+
           // Campo de valor pago e troco (apenas para dinheiro)
           if (_formaPagamento == 'dinheiro') ...[
             const SizedBox(height: 12),
@@ -1827,7 +1889,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                 Expanded(
                   child: TextFormField(
                     controller: _valorPagoController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
                       labelText: 'Valor Recebido',
                       prefixText: 'R\$ ',
@@ -1846,7 +1909,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                 if (_troco > 0) ...[
                   const SizedBox(width: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.green[50],
                       borderRadius: BorderRadius.circular(8),
@@ -1873,7 +1937,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               ],
             ),
           ],
-          
+
           const SizedBox(height: 16),
           Row(
             children: [
@@ -1933,12 +1997,12 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         .replaceAll('.', '')
         .replaceAll(',', '.')
         .trim();
-    
+
     if (valorText.isEmpty) {
       setState(() => _troco = 0.0);
       return;
     }
-    
+
     try {
       final valorPago = double.parse(valorText);
       setState(() {
@@ -1948,10 +2012,10 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       setState(() => _troco = 0.0);
     }
   }
-  
+
   Widget _buildOpcaoPagamento(String valor, IconData icone, String label) {
     final isSelected = _formaPagamento == valor;
-    
+
     return ChoiceChip(
       selected: isSelected,
       onSelected: (selected) {
@@ -1990,7 +2054,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       );
       return;
     }
-    
+
     // Validar pagamento em dinheiro
     if (_formaPagamento == 'dinheiro' && _valorPagoController.text.isNotEmpty) {
       final total = _subtotal + _taxaEntrega;
@@ -1999,7 +2063,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           .replaceAll('.', '')
           .replaceAll(',', '.')
           .trim();
-      
+
       try {
         final valorPago = double.parse(valorText);
         if (valorPago < total) {
@@ -2023,7 +2087,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     }
 
     if (!mounted) return;
-    
+
     // Mostrar loading
     showDialog(
       context: context,
@@ -2036,11 +2100,14 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     try {
       // Preparar dados do pedido para o banco
       final agora = DateTime.now();
-      final numeroPedido = '${agora.millisecondsSinceEpoch}'.substring(7).padLeft(6, '0');
-      
+      final numeroPedido =
+          '${agora.millisecondsSinceEpoch}'.substring(7).padLeft(6, '0');
+
       String nomeCliente = _clienteController.text.trim();
       if (nomeCliente.isEmpty) {
-        nomeCliente = _tipoPedido == 'balcao' ? _nomeRetiradaController.text.trim() : 'Cliente não informado';
+        nomeCliente = _tipoPedido == 'balcao'
+            ? _nomeRetiradaController.text.trim()
+            : 'Cliente não informado';
       }
 
       // Definir tipo do pedido baseado na seleção
@@ -2064,7 +2131,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       if (_observacoesController.text.trim().isNotEmpty) {
         observacoes = _observacoesController.text.trim();
       }
-      if (_tipoPedido == 'delivery' && _enderecoController.text.trim().isNotEmpty) {
+      if (_tipoPedido == 'delivery' &&
+          _enderecoController.text.trim().isNotEmpty) {
         observacoes += '\nEndereço: ${_enderecoController.text.trim()}';
       }
       if (_tipoPedido == 'mesa') {
@@ -2077,13 +2145,17 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       final supabase = Supabase.instance.client;
 
       // Preparar forma de pagamento
-      String formaPagamentoTexto = _formaPagamento == 'dinheiro' ? 'Dinheiro' : 
-                                   _formaPagamento == 'pix' ? 'PIX' : 'Cartão';
-      
+      String formaPagamentoTexto = _formaPagamento == 'dinheiro'
+          ? 'Dinheiro'
+          : _formaPagamento == 'pix'
+              ? 'PIX'
+              : 'Cartão';
+
       // Calcular valor pago e troco se for dinheiro
       double? valorPago;
       double? trocoCalculado;
-      if (_formaPagamento == 'dinheiro' && _valorPagoController.text.isNotEmpty) {
+      if (_formaPagamento == 'dinheiro' &&
+          _valorPagoController.text.isNotEmpty) {
         final valorText = _valorPagoController.text
             .replaceAll('R\$', '')
             .replaceAll('.', '')
@@ -2097,17 +2169,18 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       final pedidoData = <String, dynamic>{
         'numero': numeroPedido,
         'tipo': tipoPedidoDb,
-        'total': _subtotal + (_tipoPedido == 'delivery' ? _taxaEntregaEditavel : 0.0),
+        'total': _subtotal +
+            (_tipoPedido == 'delivery' ? _taxaEntregaEditavel : 0.0),
         'forma_pagamento': formaPagamentoTexto,
         'observacoes': observacoes.trim().isEmpty ? null : observacoes.trim(),
         // Removido campo status que estava causando erro de constraint
       };
-      
+
       // Adicionar mesa_id se for pedido de mesa
       if (_tipoPedido == 'mesa') {
         pedidoData['mesa_id'] = _mesaSelecionada;
       }
-      
+
       // Adicionar campos opcionais se tiverem valor
       if (valorPago != null) {
         pedidoData['valor_pago'] = valorPago;
@@ -2119,11 +2192,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       // Dados do pedido preparados para salvar
 
       // Inserir pedido
-      final pedidoResponse = await supabase
-          .from('pedidos')
-          .insert(pedidoData)
-          .select()
-          .single();
+      final pedidoResponse =
+          await supabase.from('pedidos').insert(pedidoData).select().single();
 
       // Pedido salvo com sucesso
 
@@ -2136,7 +2206,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             'pedido_id': pedidoId,
             'nome_item': item['nome'],
             'quantidade': item['quantidade'],
-            'preco_unitario': item['preco'] ?? (item['total'] / item['quantidade']),
+            'preco_unitario':
+                item['preco'] ?? (item['total'] / item['quantidade']),
             'subtotal': item['total'],
             'observacoes': item['observacao'] ?? '',
             'tamanho': _tamanhoSelecionado,
@@ -2165,13 +2236,12 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
 
       // Ir para tela de caixa para mostrar o pedido no fechamento
       Navigator.of(context).pushReplacementNamed('/caixa');
-      
     } catch (e) {
       // Erro ao criar pedido
-      
+
       if (!mounted) return;
       Navigator.of(context).pop(); // Fechar loading
-      
+
       // Mensagem de erro mais específica
       String mensagemErro = 'Erro ao criar pedido';
       if (e.toString().contains('duplicate')) {
@@ -2181,7 +2251,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       } else if (e.toString().contains('network')) {
         mensagemErro = 'Erro de conexão com o servidor';
       }
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Column(

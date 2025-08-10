@@ -5,12 +5,14 @@ class EstadoCaixa {
   final String? dataAbertura;
   final double? saldoInicial;
   final int? id;
+  final String? nomeOperador;
 
   EstadoCaixa({
     required this.aberto,
     this.dataAbertura,
     this.saldoInicial,
     this.id,
+    this.nomeOperador,
   });
 }
 
@@ -53,15 +55,16 @@ class CaixaService {
       }
       
       final ultimoCaixa = response.first;
-      final bool aberto = ultimoCaixa['data_fechamento'] == null;
+      final bool aberto = ultimoCaixa['hora_fechamento'] == null;
       
-      // DEBUG: Último caixa - ID: ${ultimoCaixa['id']}, Data fechamento: ${ultimoCaixa['data_fechamento']}, Aberto: $aberto
+      // DEBUG: Último caixa - ID: ${ultimoCaixa['id']}, Data fechamento: ${ultimoCaixa['hora_fechamento']}, Aberto: $aberto
       
       final estado = EstadoCaixa(
         aberto: aberto,
         dataAbertura: ultimoCaixa['data_abertura'],
-        saldoInicial: ultimoCaixa['saldo_inicial']?.toDouble(),
+        saldoInicial: ultimoCaixa['valor_inicial']?.toDouble(),
         id: ultimoCaixa['id'],
+        nomeOperador: ultimoCaixa['operador_nome'],
       );
       
       // DEBUG: Estado retornado: Aberto: ${estado.aberto}, ID: ${estado.id}
@@ -79,48 +82,44 @@ class CaixaService {
       throw Exception('Já existe um caixa aberto');
     }
     
-    // Se foi fornecido um nome, criar/buscar usuário
-    int usuarioId = 1; // Default
+    // Se foi fornecido um nome, criar/buscar operador
+    int operadorId = 1; // Default
     if (nomeUsuario != null && nomeUsuario.isNotEmpty) {
       try {
-        // Primeiro tenta buscar o usuário pelo nome
-        final usuarios = await _supabase
-            .from('usuarios')
+        // Primeiro tenta buscar o operador pelo nome
+        final operadores = await _supabase
+            .from('operadores')
             .select('id')
             .eq('nome', nomeUsuario)
             .limit(1);
         
-        if (usuarios.isNotEmpty) {
-          usuarioId = usuarios.first['id'];
+        if (operadores.isNotEmpty) {
+          operadorId = operadores.first['id'];
         } else {
-          // Se não existe, cria um novo usuário
-          final novoUsuario = await _supabase
-              .from('usuarios')
+          // Se não existe, cria um novo operador
+          final novoOperador = await _supabase
+              .from('operadores')
               .insert({'nome': nomeUsuario, 'ativo': true})
               .select('id')
               .single();
-          usuarioId = novoUsuario['id'];
+          operadorId = novoOperador['id'];
         }
       } catch (e) {
-        // Se houver erro, usa o usuário padrão
-        usuarioId = 1;
+        // Se houver erro, usa o operador padrão
+        operadorId = 1;
       }
     }
     
     final dadosCaixa = {
       'data_abertura': DateTime.now().toIso8601String(),
-      'saldo_inicial': saldoInicial,
+      'valor_inicial': saldoInicial,
       'observacoes': observacoes,
-      'usuario_id': usuarioId,
+      'operador_id': operadorId,
     };
     
-    // Adiciona nome_operador apenas se o campo existir na tabela
-    // Por enquanto, salvamos nas observações
+    // Adiciona nome_operador se foi fornecido
     if (nomeUsuario != null && nomeUsuario.isNotEmpty) {
-      final obsCompleta = observacoes.isEmpty 
-          ? 'Operador: $nomeUsuario'
-          : '$observacoes | Operador: $nomeUsuario';
-      dadosCaixa['observacoes'] = obsCompleta;
+      dadosCaixa['operador_nome'] = nomeUsuario;
     }
     
     await _supabase.from('caixa').insert(dadosCaixa);
@@ -141,12 +140,12 @@ class CaixaService {
     final result = await _supabase
         .from('caixa')
         .update({
-          'data_fechamento': DateTime.now().toIso8601String(),
-          'saldo_final': resumo.saldoFinal,
-          'total_vendas': resumo.totalVendas,
-          'total_dinheiro': resumo.totalDinheiro,
-          'total_cartao': resumo.totalCartao,
-          'total_pix': resumo.totalPix,
+          'hora_fechamento': DateTime.now().toIso8601String(),
+          'valor_final': resumo.saldoFinal,
+          'valor_vendas': resumo.totalVendas,
+          'valor_dinheiro': resumo.totalDinheiro,
+          'valor_cartao': resumo.totalCartao,
+          'valor_pix': resumo.totalPix,
         })
         .eq('id', estado.id!)
         .select();

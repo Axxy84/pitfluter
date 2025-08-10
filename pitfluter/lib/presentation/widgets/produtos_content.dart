@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProdutosContent extends StatefulWidget {
@@ -45,33 +46,18 @@ class _ProdutosContentState extends State<ProdutosContent>
     });
 
     try {
-      // Primeiro, carregar todos os tamanhos
-      final tamanhosResponse =
-          await supabase.from('produtos_tamanho').select('id, nome');
-
-      // Criar mapa de tamanhos
-      // DEBUG: Tamanhos carregados
-      for (final t in tamanhosResponse) {
-        final id = t['id'];
-        final nome = t['nome'];
-        // DEBUG: ID: $id (${id.runtimeType}), Nome: $nome
-        // Tentar converter para int se necessário
-        if (id is int) {
-          tamanhos[id] = nome as String;
-        } else if (id is String) {
-          tamanhos[int.tryParse(id) ?? 0] = nome as String;
-        }
-      }
-      // DEBUG: Mapa de tamanhos criado: $tamanhos
+      // Criar mapa de tamanhos fixos (já que a tabela tamanhos não existe)
+      // Baseado nos tamanho_id encontrados em produtos_precos (1,2,3,4)
+      tamanhos = {1: 'Pequena', 2: 'Média', 3: 'Grande', 4: 'Família'};
 
       // Buscar o ID da categoria "Pizzas Promocionais" para excluí-la
-      final categPromoResponse = await supabase
-          .from('produtos_categoria')
-          .select('id')
-          .eq('nome', 'Pizzas Promocionais')
-          .maybeSingle();
-
-      final categPromoId = categPromoResponse?['id'];
+      // Buscar o ID da categoria "Pizzas Promocionais" para excluí-la (se necessário)
+      // final categPromoResponse = await supabase
+      //     .from('categorias')
+      //     .select('id')
+      //     .eq('nome', 'Pizzas Promocionais')
+      //     .maybeSingle();
+      // final categPromoId = categPromoResponse?['id'];
 
       // Carregar produtos da tabela produtos (única fonte agora)
       final produtosResponse = await supabase.from('produtos').select('''
@@ -79,21 +65,17 @@ class _ProdutosContentState extends State<ProdutosContent>
             produtos_precos (
               preco,
               preco_promocional,
-              tamanho_id,
-              produtos_tamanho ( id, nome )
+              tamanho_id
+            ),
+            categorias (
+              id,
+              nome
             )
           ''').order('nome');
 
       produtos = List<Map<String, dynamic>>.from(produtosResponse);
 
-      // DEBUG: Verificar estrutura dos produtos
-      print('🔍 Produtos carregados: ${produtos.length}');
-      for (final p in produtos.take(3)) {
-        print('📦 Produto: ${p['nome']}');
-        print('   Preços: ${p['produtos_precos']}');
-      }
-
-      // DEBUG: estrutura dos produtos carregada
+      // Produtos carregados com sucesso
 
       // Carregar categorias da tabela categorias (única fonte agora)
       final categoriasResponse = await supabase
@@ -437,6 +419,7 @@ class _ProdutoCard extends StatelessWidget {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -453,7 +436,7 @@ class _ProdutoCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          // Funcionalidade de editar produto será implementada
+          _showEditPricesDialog(context, produto, tamanhos);
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -531,43 +514,16 @@ class _ProdutoCard extends StatelessWidget {
                     Builder(builder: (context) {
                       final precos = produto['produtos_precos'] as List?;
 
-                      // DEBUG: Verificar estrutura dos preços
-                      if (produto['nome'].toString().contains('Chocolate') ||
-                          produto['nome'].toString().contains('Nutella')) {
-                        print('🎯 Produto: ${produto['nome']}');
-                        print('   precos: $precos');
-                      }
-
                       if (precos != null && precos.isNotEmpty) {
                         // Se tem múltiplos tamanhos, mostrar todos os tamanhos com preços
                         if (precos.length > 1) {
                           // Ordenar por tamanho
                           final precosOrdenados = List.from(precos);
                           precosOrdenados.sort((a, b) {
-                            String nomeA = a['produtos_tamanho']?['nome'] ?? '';
-                            String nomeB = b['produtos_tamanho']?['nome'] ?? '';
-                            int idx(String nome) {
-                              final n = nome.toString().toLowerCase();
-                              if (n.contains('broto') || n == 'p') {
-                                return 0;
-                              }
-                              if (n.contains('média') ||
-                                  n.contains('media') ||
-                                  n == 'm') {
-                                return 1;
-                              }
-                              if (n.contains('grande') || n == 'g') {
-                                return 2;
-                              }
-                              if (n.contains('família') ||
-                                  n.contains('familia') ||
-                                  n == 'gg') {
-                                return 3;
-                              }
-                              return 99;
-                            }
-
-                            return idx(nomeA).compareTo(idx(nomeB));
+                            // Usar tamanho_id para ordenar (1=P, 2=M, 3=G, 4=F)
+                            int tamanhoA = a['tamanho_id'] ?? 99;
+                            int tamanhoB = b['tamanho_id'] ?? 99;
+                            return tamanhoA.compareTo(tamanhoB);
                           });
 
                           return Column(
@@ -577,16 +533,20 @@ class _ProdutoCard extends StatelessWidget {
                                 spacing: 8,
                                 runSpacing: 4,
                                 children: precosOrdenados.map((p) {
-                                  // Preferir nome direto do JOIN
-                                  String tamanho = p['produtos_tamanho']
-                                          ?['nome'] ??
-                                      tamanhos[(p['tamanho_id'] is int)
-                                          ? p['tamanho_id'] as int
-                                          : int.tryParse(
-                                                  p['tamanho_id']?.toString() ??
-                                                      '') ??
-                                              -1] ??
-                                      '?';
+                                  // Converter tamanho_id para abreviação P, M, G, F
+                                  int? tamanhoId = p['tamanho_id'];
+                                  String tamanhoAbreviado = '';
+                                  if (tamanhoId == 1) {
+                                    tamanhoAbreviado = 'P';
+                                  } else if (tamanhoId == 2) {
+                                    tamanhoAbreviado = 'M';
+                                  } else if (tamanhoId == 3) {
+                                    tamanhoAbreviado = 'G';
+                                  } else if (tamanhoId == 4) {
+                                    tamanhoAbreviado = 'F';
+                                  } else {
+                                    tamanhoAbreviado = '?';
+                                  }
 
                                   // Usar preco_promocional se disponível, senão preco
                                   final preco =
@@ -599,7 +559,7 @@ class _ProdutoCard extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
-                                      '$tamanho: R\$ ${preco.toStringAsFixed(2)}',
+                                      '$tamanhoAbreviado: R\$ ${preco.toStringAsFixed(2)}',
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
@@ -667,7 +627,7 @@ class _ProdutoCard extends StatelessWidget {
 
                     const SizedBox(height: 4),
 
-                    // Status
+                    // Status e botão editar
                     Row(
                       children: [
                         Icon(
@@ -687,6 +647,23 @@ class _ProdutoCard extends StatelessWidget {
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () {
+                            _showEditPricesDialog(context, produto, tamanhos);
+                          },
+                          icon: Icon(
+                            Icons.edit,
+                            size: 18,
+                            color: colorScheme.primary,
+                          ),
+                          tooltip: 'Editar Preços',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -697,5 +674,247 @@ class _ProdutoCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static void _showEditPricesDialog(BuildContext context, Map<String, dynamic> produto, Map<int, String> tamanhos) {
+    final supabase = Supabase.instance.client;
+    
+    // Controllers para os campos de preço
+    final Map<int, TextEditingController> priceControllers = {};
+    final Map<int, bool> hasChanges = {};
+    
+    // Inicializar controllers com os preços atuais
+    final precos = produto['produtos_precos'] as List? ?? [];
+    final precosMap = <int, double>{};
+    
+    for (final preco in precos) {
+      final tamanhoId = preco['tamanho_id'] as int;
+      final precoValor = (preco['preco'] as num).toDouble();
+      precosMap[tamanhoId] = precoValor;
+    }
+
+    // Criar controllers para todos os tamanhos (1,2,3,4)
+    for (int i = 1; i <= 4; i++) {
+      final precoAtual = precosMap[i];
+      priceControllers[i] = TextEditingController(
+        text: precoAtual != null ? precoAtual.toStringAsFixed(2).replaceAll('.', ',') : '',
+      );
+      hasChanges[i] = false;
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            bool hasAnyChanges = hasChanges.values.any((changed) => changed);
+            
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Editar Preços',
+                      style: TextStyle(fontSize: 18),
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 400,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Nome do produto
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.local_pizza, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              produto['nome'] ?? '',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Campos de preço para cada tamanho
+                    ...tamanhos.entries.map((tamanhoEntry) {
+                      final tamanhoId = tamanhoEntry.key;
+                      final tamanhoNome = tamanhoEntry.value;
+                      final controller = priceControllers[tamanhoId]!;
+                      final isChanged = hasChanges[tamanhoId]!;
+                      
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: TextFormField(
+                          controller: controller,
+                          decoration: InputDecoration(
+                            labelText: tamanhoNome,
+                            prefixText: 'R\$ ',
+                            border: const OutlineInputBorder(),
+                            filled: isChanged,
+                            fillColor: isChanged 
+                                ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.2)
+                                : null,
+                            suffixIcon: isChanged 
+                                ? Icon(Icons.edit, size: 16, color: Theme.of(context).colorScheme.primary)
+                                : null,
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              hasChanges[tamanhoId] = true;
+                            });
+                          },
+                        ),
+                      );
+                    }),
+                    
+                    if (hasAnyChanges) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info, size: 16, color: Colors.orange),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Há alterações não salvas',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.orange[800],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Cancelar'),
+                ),
+                if (hasAnyChanges)
+                  ElevatedButton(
+                    onPressed: () async {
+                      // Salvar alterações
+                      try {
+                        for (final tamanhoId in hasChanges.keys) {
+                          if (hasChanges[tamanhoId]!) {
+                            final controller = priceControllers[tamanhoId]!;
+                            final precoText = controller.text.replaceAll(',', '.');
+                            
+                            if (precoText.isNotEmpty) {
+                              final preco = double.tryParse(precoText);
+                              
+                              if (preco != null && preco > 0) {
+                                // Verificar se já existe um preço para este produto e tamanho
+                                final existingPrices = await supabase
+                                    .from('produtos_precos')
+                                    .select('id')
+                                    .eq('produto_id', produto['id'])
+                                    .eq('tamanho_id', tamanhoId);
+
+                                if (existingPrices.isNotEmpty) {
+                                  // Atualizar preço existente
+                                  await supabase
+                                      .from('produtos_precos')
+                                      .update({'preco': preco})
+                                      .eq('produto_id', produto['id'])
+                                      .eq('tamanho_id', tamanhoId);
+                                } else {
+                                  // Inserir novo preço
+                                  await supabase.from('produtos_precos').insert({
+                                    'produto_id': produto['id'],
+                                    'tamanho_id': tamanhoId,
+                                    'preco': preco,
+                                  });
+                                }
+                              }
+                            } else {
+                              // Se campo vazio, deletar preço existente
+                              await supabase
+                                  .from('produtos_precos')
+                                  .delete()
+                                  .eq('produto_id', produto['id'])
+                                  .eq('tamanho_id', tamanhoId);
+                            }
+                          }
+                        }
+                        
+                        Navigator.of(dialogContext).pop();
+                        
+                        // Mostrar mensagem de sucesso e recarregar dados
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Preços de "${produto['nome']}" atualizados com sucesso!'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                          
+                          // Forçar rebuild do widget pai
+                          final produtosContent = context.findAncestorStateOfType<_ProdutosContentState>();
+                          produtosContent?._loadData();
+                        }
+                        
+                      } catch (e) {
+                        
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Erro ao salvar preços: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                    ),
+                    child: const Text('Salvar Alterações'),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((_) {
+      // Dispose dos controllers
+      for (final controller in priceControllers.values) {
+        controller.dispose();
+      }
+    });
   }
 }

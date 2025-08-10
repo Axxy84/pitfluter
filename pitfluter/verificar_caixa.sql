@@ -42,9 +42,9 @@ CREATE TABLE IF NOT EXISTS movimentos_caixa (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 4. Verificar se existe caixa aberto
+-- 4. Verificar se existe caixa aberto (data_fechamento NULL significa caixa aberto)
 SELECT * FROM caixa 
-WHERE status = 'aberto' 
+WHERE data_fechamento IS NULL 
 ORDER BY data_abertura DESC 
 LIMIT 1;
 

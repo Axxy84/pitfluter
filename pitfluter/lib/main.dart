@@ -9,6 +9,7 @@ import 'presentation/screens/historico_caixas_screen.dart';
 import 'presentation/screens/lista_pedidos_screen.dart';
 import 'presentation/screens/mesas_abertas_screen.dart';
 import 'presentation/screens/inicial_screen.dart';
+import 'presentation/screens/price_editor_screen.dart';
 import 'presentation/layouts/main_layout.dart';
 import 'core/constants/supabase_constants.dart';
 
@@ -74,6 +75,7 @@ class MyApp extends StatelessWidget {
         '/caixa': (context) => const CaixaScreen(),
         '/historico-caixas': (context) => const HistoricoCaixasScreen(),
         '/mesas-abertas': (context) => const MesasAbertasScreen(),
+        '/editar-precos': (context) => const PriceEditorScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/novo-pedido') {

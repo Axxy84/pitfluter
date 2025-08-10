@@ -44,6 +44,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   String _filtroTexto = '';
   bool _carregandoProdutos = false;
   List<Map<String, dynamic>> _produtosBanco = [];
+  List<Map<String, dynamic>> _bordasBanco = [];
 
   // Removido multiplicadores - agora usa preços específicos do banco
 
@@ -114,7 +115,32 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             )
           ''').eq('ativo', true).order('nome');
 
+      // Query para bordas recheadas
+      final bordasResponse = await supabase.from('bordas_recheadas').select('''
+            id,
+            nome,
+            descricao,
+            preco,
+            tipo,
+            ativo
+          ''').eq('ativo', true).order('nome');
+
       setState(() {
+        // Processar bordas
+        _bordasBanco = bordasResponse.map((borda) {
+          return {
+            'id': borda['id'],
+            'nome': borda['nome'] as String,
+            'descricao': borda['descricao'] ?? '',
+            'preco': (borda['preco'] as num).toDouble(),
+            'tipo': borda['tipo'] ?? 'salgada',
+            'categoriaId': 999, // ID fictício para bordas
+            'categoriaNome': 'Bordas Recheadas',
+            'imagemUrl': null,
+            'imagem': borda['tipo'] == 'doce' ? '🍫' : '🧀',
+            'tipoProduto': 'borda',
+          };
+        }).toList();
         _produtosBanco = produtosResponse.map((produto) {
           // Usar categorias ao invés de produtos_categoria
           final categoria = produto['categorias'];
@@ -260,20 +286,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           }).toList();
           break;
         case 2:
-          // Bordas - usar mesmo mapeamento da tela produtos
-          produtos = _produtosBanco.where((p) {
-            final categoria = p['categoriaNome'].toString().toLowerCase();
-            final tipoProduto = p['tipoProduto'].toString().toLowerCase();
-            final nomeProduto = p['nome'].toString().toLowerCase();
-
-            // Palavras-chave para bordas (mesmo critério da tela produtos)
-            final palavrasChaveBorda = ['borda', 'bordas', 'bordas recheadas'];
-
-            return palavrasChaveBorda.any((palavra) =>
-                categoria.contains(palavra.toLowerCase()) ||
-                tipoProduto.contains(palavra.toLowerCase()) ||
-                nomeProduto.contains('borda'));
-          }).toList();
+          // Bordas - usar dados específicos da tabela bordas_recheadas
+          produtos = _bordasBanco;
           break;
         default:
           produtos = _produtosBanco;

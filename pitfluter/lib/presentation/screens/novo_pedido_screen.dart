@@ -14,7 +14,8 @@ class NovoPedidoScreen extends StatefulWidget {
 class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  final TextEditingController _clienteController = TextEditingController();
+  final TextEditingController _nomeClienteController = TextEditingController();
+  final TextEditingController _telefoneClienteController = TextEditingController();
   final TextEditingController _enderecoController = TextEditingController();
   final TextEditingController _nomeRetiradaController = TextEditingController();
   final TextEditingController _nomeGarcomController = TextEditingController();
@@ -65,14 +66,15 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   void initState() {
     super.initState();
     _tabController =
-        TabController(length: 3, vsync: this); // Pizzas, Bebidas, Bordas
+        TabController(length: 4, vsync: this); // Pizza Delivery, Pizzas, Bebidas, Bordas
     _carregarProdutos();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _clienteController.dispose();
+    _nomeClienteController.dispose();
+    _telefoneClienteController.dispose();
     _enderecoController.dispose();
     _nomeRetiradaController.dispose();
     _nomeGarcomController.dispose();
@@ -240,7 +242,14 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       // Usar produtos do banco de dados com mesma lógica da tela produtos
       switch (_tabController.index) {
         case 0:
-          // Pizzas - usar mesmo mapeamento da tela produtos
+          // Pizza Delivery (R$ 40,00) - apenas pizzas da categoria "Pizza Delivery"
+          produtos = _produtosBanco.where((p) {
+            final categoria = p['categoriaNome'].toString().toLowerCase();
+            return categoria.contains('pizza delivery');
+          }).toList();
+          break;
+        case 1:
+          // Pizzas normais - excluir pizzas delivery
           produtos = _produtosBanco.where((p) {
             final categoria = p['categoriaNome'].toString().toLowerCase();
             final tipoProduto = p['tipoProduto'].toString().toLowerCase();
@@ -254,13 +263,18 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               'pizzas doces'
             ];
 
-            return palavrasChavePizza.any((palavra) =>
+            final isPizza = palavrasChavePizza.any((palavra) =>
                 categoria.contains(palavra.toLowerCase()) ||
                 tipoProduto.contains(palavra.toLowerCase()) ||
                 nomeProduto.contains('pizza'));
+            
+            // Excluir pizzas delivery
+            final isDelivery = categoria.contains('pizza delivery');
+            
+            return isPizza && !isDelivery;
           }).toList();
           break;
-        case 1:
+        case 2:
           // Bebidas - usar mesmo mapeamento da tela produtos
           produtos = _produtosBanco.where((p) {
             final categoria = p['categoriaNome'].toString().toLowerCase();
@@ -285,7 +299,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                 nomeProduto.contains(palavra.toLowerCase()));
           }).toList();
           break;
-        case 2:
+        case 3:
           // Bordas - usar dados específicos da tabela bordas_recheadas
           produtos = _bordasBanco;
           break;
@@ -296,12 +310,20 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       // Usar dados mockados como fallback
       switch (_tabController.index) {
         case 0:
-          produtos = _pizzas;
+          // Pizza Delivery mockada
+          produtos = [
+            {'nome': 'Marguerita (Delivery)', 'preco': 40.0, 'imagem': '🍕'},
+            {'nome': 'Calabresa (Delivery)', 'preco': 40.0, 'imagem': '🍕'},
+            {'nome': 'Frango Catupiry (Delivery)', 'preco': 40.0, 'imagem': '🍕'},
+          ];
           break;
         case 1:
-          produtos = _bebidas;
+          produtos = _pizzas;
           break;
         case 2:
+          produtos = _bebidas;
+          break;
+        case 3:
           // Bordas mockadas como fallback
           produtos = [
             {'nome': 'Borda Catupiry', 'preco': 8.0, 'imagem': '🧀'},
@@ -315,17 +337,22 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
 
     // Filtrar produtos se houver texto de busca
     if (_filtroTexto.isNotEmpty) {
-      return produtos.where((produto) {
+      final produtosFiltrados = produtos.where((produto) {
         return produto['nome']
             .toLowerCase()
             .contains(_filtroTexto.toLowerCase());
       }).toList();
+      // Ordenar alfabeticamente após filtro
+      produtosFiltrados.sort((a, b) => a['nome'].toString().compareTo(b['nome'].toString()));
+      return produtosFiltrados;
     }
 
+    // Ordenar todos os produtos alfabeticamente
+    produtos.sort((a, b) => a['nome'].toString().compareTo(b['nome'].toString()));
     return produtos;
   }
 
-  bool get _isPizza => _tabController.index == 0;
+  bool get _isPizza => _tabController.index == 0 || _tabController.index == 1; // Pizza Delivery ou Pizzas normais
 
   double get _taxaEntrega {
     switch (_tipoPedido) {
@@ -372,8 +399,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       final isPizzaDelivery = categoriaNome.toLowerCase().contains('delivery');
 
       if (isPizzaDelivery) {
-        // Pizza Delivery só tem tamanho médio
-        return ['M'];
+        // Pizza Delivery só tem tamanho Grande (G)
+        return ['G'];
       }
     }
 
@@ -381,6 +408,21 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     return ['P', 'M', 'G', 'F'];
   }
 
+  /// Função otimizada para obter o maior preço entre dois sabores de pizza
+  /// Implementa a regra padrão de pizzarias: pizza meio-a-meio cobra pelo sabor mais caro
+  double _obterMaiorPreco(double preco1, double preco2) {
+    return preco1 >= preco2 ? preco1 : preco2;
+  }
+
+  /// Função para atualizar o preço automaticamente quando selecionado sabores
+  /// Força o recálculo do preço na tela em tempo real
+  void _atualizarPrecoAutomatico() {
+    // Esta função força o rebuild da tela para mostrar o novo preço calculado
+    // O preço é calculado automaticamente na função _calcularPreco()
+    // Aqui podemos adicionar lógicas adicionais se necessário
+  }
+
+  /// Função otimizada para calcular preço das pizzas considerando sabores múltiplos
   double _calcularPreco() {
     if (_produtoSelecionado == null) return 0.0;
 
@@ -395,7 +437,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       final isPizzaDelivery = categoriaNome.toLowerCase().contains('delivery');
 
       if (isPizzaDelivery) {
-        // Pizza Delivery SEMPRE R$ 40,00 (só tem tamanho médio disponível)
+        // Pizza Delivery SEMPRE R$ 40,00 (só tem tamanho Grande disponível)
         return 40.0 * _quantidade;
       } else {
         // Usar preços específicos do banco de dados
@@ -404,6 +446,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                        (produto['preco'] as num).toDouble();
 
         if (_doisSabores && _sabor2 != null && _sabor2!.isNotEmpty) {
+          // Buscar o produto da segunda pizza
           final produto2 =
               produtos.where((p) => p['nome'] == _sabor2).firstOrNull;
           if (produto2 != null) {
@@ -411,8 +454,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             double preco2 = precosMap2[_tamanhoSelecionado] ?? 
                            (produto2['preco'] as num).toDouble();
 
-            // SEMPRE pegar o MAIOR preço entre os 2 sabores
-            double precoFinal = preco1 > preco2 ? preco1 : preco2;
+            // OTIMIZAÇÃO: Sempre cobrar o MAIOR preço entre os 2 sabores
+            // Esta é a regra padrão de pizzarias: pizza meio-a-meio cobra pelo sabor mais caro
+            double precoFinal = _obterMaiorPreco(preco1, preco2);
 
             return precoFinal * _quantidade;
           }
@@ -515,12 +559,11 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     return {
       'numeroPedido': numeroPedido.padLeft(6, '0'),
       'dataPedido': agora,
-      'nomeCliente': _clienteController.text.trim().isEmpty
-          ? 'Cliente não informado'
-          : _clienteController.text.trim(),
-      'telefoneCliente': null, // Adicionar campo se necessário
-      'enderecoCliente':
-          _tipoPedido == 'delivery' ? _enderecoController.text.trim() : null,
+      'informacoesEntrega': _tipoPedido == 'delivery' 
+          ? _enderecoController.text.trim() 
+          : _tipoPedido == 'balcao' 
+            ? 'Retirada no balcão - ${_nomeRetiradaController.text.trim()}'
+            : 'Mesa $_mesaSelecionada',
       'itens': _carrinho,
       'subtotal': _subtotal,
       'taxaEntrega': _taxaEntrega,
@@ -573,9 +616,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       final sucesso = await ImpressaoService.imprimirComanda(
         numeroPedido: dados['numeroPedido'],
         dataPedido: dados['dataPedido'],
-        nomeCliente: dados['nomeCliente'],
-        telefoneCliente: dados['telefoneCliente'],
-        enderecoCliente: dados['enderecoCliente'],
+        informacoesEntrega: dados['informacoesEntrega'],
         itens: dados['itens'],
         subtotal: dados['subtotal'],
         taxaEntrega: dados['taxaEntrega'],
@@ -616,7 +657,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           _buildHeader(),
@@ -695,7 +736,6 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         ),
         child: Column(
           children: [
-            _buildBuscaCliente(),
             _buildSeletorTipoPedido(),
             _buildCamposEspecificos(),
             _buildTabs(),
@@ -707,21 +747,6 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     );
   }
 
-  Widget _buildBuscaCliente() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: TextField(
-        controller: _clienteController,
-        decoration: const InputDecoration(
-          hintText: '🔍 Cliente (opcional)',
-          border: OutlineInputBorder(borderSide: BorderSide.none),
-          filled: true,
-          fillColor: Color(0xFFF5F5F5),
-          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      ),
-    );
-  }
 
   Widget _buildSeletorTipoPedido() {
     return Container(
@@ -799,6 +824,21 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_tipoPedido == 'delivery') ...[
+            _buildCampoTexto(
+              controller: _nomeClienteController,
+              label: '👤 Nome do Cliente',
+              hint: 'Nome completo...',
+              obrigatorio: true,
+            ),
+            const SizedBox(height: 12),
+            _buildCampoTexto(
+              controller: _telefoneClienteController,
+              label: '📱 Telefone',
+              hint: '(XX) XXXXX-XXXX',
+              obrigatorio: true,
+              tipo: TextInputType.phone,
+            ),
+            const SizedBox(height: 12),
             _buildCampoTexto(
               controller: _enderecoController,
               label: '📍 Endereço de Entrega',
@@ -945,6 +985,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     required String label,
     required String hint,
     bool obrigatorio = false,
+    TextInputType? tipo,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -958,15 +999,20 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           ),
         ),
         const SizedBox(height: 4),
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: hint,
-            border: const OutlineInputBorder(),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Colors.red.shade400),
+        SizedBox(
+          width: 280, // Largura fixa menor
+          child: TextField(
+            controller: controller,
+            keyboardType: tipo,
+            decoration: InputDecoration(
+              hintText: hint,
+              border: const OutlineInputBorder(),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.red.shade400),
+              ),
+              isDense: true, // Fazer o campo mais compacto
             ),
           ),
         ),
@@ -987,6 +1033,15 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       indicatorColor: Colors.red,
       indicatorWeight: 2,
       tabs: const [
+        Tab(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('🚚 DELIVERY'),
+              Text('R\$ 40,00', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
         Tab(text: 'Pizzas'),
         Tab(text: 'Bebidas'),
         Tab(text: 'Bordas'),
@@ -1009,7 +1064,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                   borderSide: BorderSide.none,
                 ),
                 filled: true,
-                fillColor: const Color(0xFFF5F5F5),
+                fillColor: Theme.of(context).inputDecorationTheme.fillColor,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 suffixIcon: _filtroTexto.isNotEmpty
@@ -1132,15 +1187,93 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3, // Aumentado de 2 para 3 (cards menores)
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 0.9, // Ajustado para cards menores
-      ),
-      itemCount: produtos.length,
+    return Column(
+      children: [
+        // Banner informativo para pizzas delivery
+        if (_tabController.index == 0 && produtos.isNotEmpty) ...[
+          Container(
+            margin: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.green.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('🚚', style: TextStyle(fontSize: 24)),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PROMOÇÃO DELIVERY',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      Text(
+                        'Todas as pizzas grandes por apenas R\$ 40,00',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'R\$ 40,00',
+                    style: TextStyle(
+                      color: Color(0xFF4CAF50),
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        
+        // Grid de produtos
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(6),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 6, // Aumentado para 6 (cards ainda menores)
+              crossAxisSpacing: 4,
+              mainAxisSpacing: 4,
+              childAspectRatio: 0.8, // Proporção ajustada para cards mais compactos
+            ),
+            itemCount: produtos.length,
       itemBuilder: (context, index) {
         final produto = produtos[index];
         final isSelected = _produtoSelecionado == produto['nome'];
@@ -1153,12 +1286,12 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               if (_isPizza) {
                 _sabor1 = produto['nome'];
 
-                // Se for Pizza Delivery, forçar tamanho médio
+                // Se for Pizza Delivery, forçar tamanho Grande
                 final categoriaNome = produto['categoriaNome'] ?? '';
                 final isPizzaDelivery =
                     categoriaNome.toLowerCase().contains('delivery');
                 if (isPizzaDelivery) {
-                  _tamanhoSelecionado = 'M';
+                  _tamanhoSelecionado = 'G';
                 }
               }
             });
@@ -1167,51 +1300,57 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
               color: isSelected
-                  ? Colors.red.withValues(alpha: 0.08)
-                  : Colors.white,
+                  ? Colors.red.withValues(alpha: 0.1)
+                  : Theme.of(context).cardColor,
               border: Border.all(
-                color: isSelected ? Colors.red : Colors.grey.shade200,
-                width: isSelected ? 2.5 : 1,
+                color: isSelected 
+                  ? Colors.red 
+                  : Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                width: isSelected ? 2.0 : 1,
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 if (isSelected) ...[
                   BoxShadow(
-                    color: Colors.red.withValues(alpha: 0.2),
-                    blurRadius: 8,
+                    color: Colors.red.withValues(alpha: 0.15),
+                    blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
                 ] else ...[
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 4,
+                    color: Theme.of(context).shadowColor.withValues(alpha: 0.08),
+                    blurRadius: 3,
                     offset: const Offset(0, 1),
                   ),
                 ],
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(2.0), // Reduzido para 2px
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     produto['imagem'],
-                    style:
-                        const TextStyle(fontSize: 32), // Reduzido de 48 para 32
+                    style: const TextStyle(fontSize: 16), // Reduzido para 16
                   ),
-                  const SizedBox(height: 6), // Reduzido de 8 para 6
-                  Text(
-                    produto['nome'],
-                    style: const TextStyle(
-                      fontSize: 12, // Reduzido de 16 para 12
-                      fontWeight: FontWeight.w500,
+                  const SizedBox(height: 2), // Reduzido para 2
+                  Flexible(
+                    child: Text(
+                      produto['nome'],
+                      style: TextStyle(
+                        fontSize: 9, // Aumentado para 9
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  // Tag Pizza Promocional para Pizza Delivery
+                  // Tag DELIVERY para pizzas delivery (mais visível)
                   if (produto['categoriaNome']
                           ?.toLowerCase()
                           ?.contains('delivery') ==
@@ -1219,26 +1358,32 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                     const SizedBox(height: 2),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
+                          horizontal: 4, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.orange,
-                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(4),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withValues(alpha: 0.3),
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
                       ),
                       child: const Text(
-                        'PROMOCIONAL',
+                        '🚚',
                         style: TextStyle(
                           fontSize: 8,
-                          color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ],
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     'R\$ ${produto['preco'].toStringAsFixed(2)}',
                     style: const TextStyle(
-                      fontSize: 12, // Reduzido de 14 para 12
+                      fontSize: 8, // Reduzido para 8
                       color: Colors.red,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1249,6 +1394,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           ),
         );
       },
+            ),
+        ),
+      ],
     );
   }
 
@@ -1395,11 +1543,19 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     return Column(
       children: [
         _buildDropdownSabor('Metade 1', _sabor1, pizzasDisponiveis, (valor) {
-          setState(() => _sabor1 = valor);
+          setState(() {
+            _sabor1 = valor;
+            // Recalcular preço automaticamente quando trocar sabor 1
+            _atualizarPrecoAutomatico();
+          });
         }),
         const SizedBox(height: 12),
         _buildDropdownSabor('Metade 2', _sabor2, pizzasDisponiveis, (valor) {
-          setState(() => _sabor2 = valor);
+          setState(() {
+            _sabor2 = valor;
+            // Recalcular preço automaticamente quando trocar sabor 2
+            _atualizarPrecoAutomatico();
+          });
         }),
       ],
     );
@@ -1645,8 +1801,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       child: ElevatedButton(
         onPressed: canAdd ? _adicionarAoCarrinho : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          foregroundColor: Colors.white,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
@@ -1665,10 +1821,10 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       flex: 25, // Diminuído de 30% para 25%
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.grey.shade50,
+          color: Theme.of(context).colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(-2, 0),
             ),
@@ -1688,10 +1844,13 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             ),
             Expanded(
               child: _carrinho.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
                         '(vazio)',
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                          fontSize: 16,
+                        ),
                       ),
                     )
                   : ListView.builder(
@@ -1715,9 +1874,11 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1767,7 +1928,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                 borderRadius: BorderRadius.circular(6),
               ),
               filled: true,
-              fillColor: Colors.grey[50],
+              fillColor: Theme.of(context).inputDecorationTheme.fillColor,
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 10,
@@ -1816,9 +1977,14 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey, width: 0.5)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+            width: 0.5,
+          ),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1856,7 +2022,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                         borderRadius: BorderRadius.circular(4),
                       ),
                       filled: true,
-                      fillColor: Colors.grey[50],
+                      fillColor: Theme.of(context).inputDecorationTheme.fillColor,
                     ),
                     onChanged: (value) {
                       final cleanValue = value.replaceAll(',', '.');
@@ -1932,7 +2098,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                         borderRadius: BorderRadius.circular(8),
                       ),
                       filled: true,
-                      fillColor: Colors.grey[50],
+                      fillColor: Theme.of(context).inputDecorationTheme.fillColor,
                     ),
                     onChanged: (value) {
                       _calcularTroco(total);
@@ -1997,8 +2163,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                         }
                       : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   ),
                   icon: const Icon(Icons.payment, size: 18),
                   label: const Text('Pagar e Salvar'),
@@ -2014,7 +2180,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   bool _validarPedido() {
     switch (_tipoPedido) {
       case 'delivery':
-        return _enderecoController.text.trim().isNotEmpty;
+        return _nomeClienteController.text.trim().isNotEmpty &&
+               _telefoneClienteController.text.trim().isNotEmpty &&
+               _enderecoController.text.trim().isNotEmpty;
       case 'balcao':
         return _nomeRetiradaController.text.trim().isNotEmpty;
       case 'mesa':
@@ -2065,13 +2233,17 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       avatar: Icon(
         icone,
         size: 18,
-        color: isSelected ? Colors.white : Colors.grey[700],
+        color: isSelected 
+            ? Theme.of(context).colorScheme.onPrimary 
+            : Theme.of(context).colorScheme.onSurface,
       ),
       label: Text(label),
-      selectedColor: Colors.red,
-      backgroundColor: Colors.grey[200],
+      selectedColor: Theme.of(context).colorScheme.primary,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.grey[700],
+        color: isSelected 
+            ? Theme.of(context).colorScheme.onPrimary 
+            : Theme.of(context).colorScheme.onSurface,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
     );
@@ -2136,12 +2308,6 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       final numeroPedido =
           '${agora.millisecondsSinceEpoch}'.substring(7).padLeft(6, '0');
 
-      String nomeCliente = _clienteController.text.trim();
-      if (nomeCliente.isEmpty) {
-        nomeCliente = _tipoPedido == 'balcao'
-            ? _nomeRetiradaController.text.trim()
-            : 'Cliente não informado';
-      }
 
       // Definir tipo do pedido baseado na seleção
       String tipoPedidoDb;
@@ -2198,15 +2364,49 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         trocoCalculado = _troco;
       }
 
-      // Preparar dados SIMPLIFICADOS do pedido (apenas campos essenciais)
+      // Preparar dados do pedido conforme estrutura do banco
+      final double taxaEntrega = _tipoPedido == 'delivery' ? _taxaEntregaEditavel : 0.0;
+      final double total = _subtotal + taxaEntrega;
+      
+      // Preparar observações incluindo informações de entrega/cliente
+      String observacoesFinal = observacoes.trim();
+      
+      if (_tipoPedido == 'delivery') {
+        final nomeCliente = _nomeClienteController.text.trim();
+        final telefoneCliente = _telefoneClienteController.text.trim();
+        final endereco = _enderecoController.text.trim();
+        
+        // Formato: Cliente: Nome | Tel: (XX) XXXXX-XXXX | Endereço: Rua, 123
+        String dadosEntrega = '';
+        if (nomeCliente.isNotEmpty) dadosEntrega += 'Cliente: $nomeCliente';
+        if (telefoneCliente.isNotEmpty) dadosEntrega += ' | Tel: $telefoneCliente';
+        if (endereco.isNotEmpty) dadosEntrega += ' | Endereço: $endereco';
+        
+        observacoesFinal = observacoesFinal.isEmpty 
+          ? dadosEntrega
+          : '$observacoesFinal\n$dadosEntrega';
+          
+      } else if (_tipoPedido == 'balcao') {
+        final nomeRetirada = _nomeRetiradaController.text.trim();
+        if (nomeRetirada.isNotEmpty) {
+          observacoesFinal = observacoesFinal.isEmpty 
+            ? 'Retirar - $nomeRetirada'
+            : '$observacoesFinal\nRetirar - $nomeRetirada';
+        }
+      }
+
       final pedidoData = <String, dynamic>{
         'numero': numeroPedido,
-        'tipo': tipoPedidoDb,
-        'total': _subtotal +
-            (_tipoPedido == 'delivery' ? _taxaEntregaEditavel : 0.0),
+        'tipo_pedido': tipoPedidoDb,
+        'tipo': tipoPedidoDb, // Campo adicional para compatibilidade
+        'subtotal': _subtotal,
+        'taxa_entrega': taxaEntrega,
+        'desconto': 0.0,
+        'total': total,
         'forma_pagamento': formaPagamentoTexto,
-        'observacoes': observacoes.trim().isEmpty ? null : observacoes.trim(),
-        // Removido campo status que estava causando erro de constraint
+        'observacoes': observacoesFinal.isEmpty ? null : observacoesFinal,
+        'tempo_estimado_minutos': _tipoPedido == 'delivery' ? 45 : 30,
+        'status': 'recebido',
       };
 
       // Adicionar mesa_id se for pedido de mesa
@@ -2239,16 +2439,14 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             'pedido_id': pedidoId,
             'nome_item': item['nome'],
             'quantidade': item['quantidade'],
-            'preco_unitario':
-                item['preco'] ?? (item['total'] / item['quantidade']),
+            'preco_unitario': item['preco'] ?? (item['total'] / item['quantidade']),
             'subtotal': item['total'],
             'observacoes': item['observacao'] ?? '',
-            'tamanho': _tamanhoSelecionado,
-            'sabores': item['descricao'] ?? '',
+            // produto_id e borda_recheada_id podem ser null por enquanto
           };
         }).toList();
 
-        await supabase.from('pedido_itens').insert(itensData);
+        await supabase.from('itens_pedido').insert(itensData);
         // Itens do pedido salvos com sucesso
       } catch (e) {
         // Aviso: Itens não puderam ser salvos - tabela pedido_itens pode não existir

@@ -276,7 +276,7 @@ class _InicialScreenState extends State<InicialScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Pizzaria Sistema',
+              'Pit-Stop',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.primary,

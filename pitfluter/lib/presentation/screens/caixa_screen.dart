@@ -237,7 +237,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
     if (_carregando) {
       return Scaffold(
         key: _scaffoldKey,
-        backgroundColor: const Color(0xFFF5F7FA),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         drawer: _buildDrawer(context),
         body: const Center(
           child: CircularProgressIndicator(),
@@ -247,7 +247,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
     
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       drawer: _buildDrawer(context),
       body: _caixaAberto ? _buildCaixaAberto() : _buildCaixaFechado(),
     );
@@ -297,12 +297,12 @@ class _CaixaScreenState extends State<CaixaScreen> {
     
     return Container(
       padding: const EdgeInsets.all(24.0),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black12,
-            offset: Offset(0, 2),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
+            offset: const Offset(0, 2),
             blurRadius: 4,
           ),
         ],
@@ -362,7 +362,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
                   Text(
                     _extrairNomeOperador(caixaAtual!.observacoes),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                   
@@ -495,11 +495,11 @@ class _CaixaScreenState extends State<CaixaScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 6,
             offset: const Offset(0, 3),
@@ -538,7 +538,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
             'R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           
@@ -547,7 +547,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
           Text(
             titulo,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.grey[600],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -559,11 +559,11 @@ class _CaixaScreenState extends State<CaixaScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 6,
             offset: const Offset(0, 3),
@@ -634,11 +634,11 @@ class _CaixaScreenState extends State<CaixaScreen> {
   Widget _buildMovimentacoes() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
             spreadRadius: 1,
             blurRadius: 6,
             offset: const Offset(0, 3),
@@ -651,7 +651,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.grey[50],
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(12),
                 topRight: Radius.circular(12),
@@ -679,7 +679,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
                           filtroSelecionado = filtro;
                         });
                       },
-                      backgroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).cardColor,
                       selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                     ),
                   );
@@ -806,7 +806,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
             children: [
               Icon(
                 icone,
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 size: 28,
               ),
               const Spacer(),
@@ -866,9 +866,9 @@ class _CaixaScreenState extends State<CaixaScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -896,7 +896,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
                 Text(
                   DateFormat('HH:mm').format(movimento.dataHora),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -910,7 +910,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
                 Text(
                   _getDescricaoFormaPagamento(movimento.formaPagamento),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey[600],
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -935,12 +935,12 @@ class _CaixaScreenState extends State<CaixaScreen> {
     
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black12,
-            offset: Offset(0, -2),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
+            offset: const Offset(0, -2),
             blurRadius: 4,
           ),
         ],
@@ -992,7 +992,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: Theme.of(context).colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -1396,9 +1396,9 @@ class _CaixaScreenState extends State<CaixaScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -1428,7 +1428,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
             'R\$ ${valor.toStringAsFixed(2)}',
             style: TextStyle(
               fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-              color: valor < 0 ? Colors.red : Colors.black,
+              color: valor < 0 ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.onSurface,
             ),
           ),
         ],
@@ -1547,15 +1547,17 @@ class _CaixaScreenState extends State<CaixaScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.lock,
             size: 100,
-            color: Colors.grey,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Caixa Fechado',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 20),
           ElevatedButton.icon(
@@ -1592,7 +1594,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Pizzaria Sistema',
+                  'Pit-Stop',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -1642,7 +1644,7 @@ class _CaixaScreenState extends State<CaixaScreen> {
               // Já estamos na tela de caixa
             },
             selected: true,
-            selectedTileColor: Colors.grey[200],
+            selectedTileColor: Theme.of(context).colorScheme.primaryContainer,
           ),
           ListTile(
             leading: const Icon(Icons.people),

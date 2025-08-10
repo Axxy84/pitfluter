@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as provider;
 import 'package:window_manager/window_manager.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -12,6 +13,7 @@ import 'presentation/screens/inicial_screen.dart';
 import 'presentation/screens/price_editor_screen.dart';
 import 'presentation/layouts/main_layout.dart';
 import 'core/constants/supabase_constants.dart';
+import 'providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,8 +41,13 @@ void main() async {
   );
 
   runApp(
-    const ProviderScope(
-      child: MyApp(),
+    provider.MultiProvider(
+      providers: [
+        provider.ChangeNotifierProvider(create: (context) => ThemeProvider()),
+      ],
+      child: const ProviderScope(
+        child: MyApp(),
+      ),
     ),
   );
 }
@@ -50,20 +57,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false, // Remove a tag DEBUG
-      title: 'Pizzaria Sistema',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFDC2626), // Vermelho pizzaria
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFDC2626),
-          foregroundColor: Colors.white,
-        ),
-      ),
-      initialRoute: '/',
+    return provider.Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Pit-Stop',
+          theme: themeProvider.lightTheme,
+          darkTheme: themeProvider.darkTheme,
+          themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          initialRoute: '/',
       routes: {
         '/': (context) =>
             const InicialScreen(), // Tela inicial que verifica o caixa
@@ -85,6 +87,8 @@ class MyApp extends StatelessWidget {
           );
         }
         return null;
+      },
+        );
       },
     );
   }

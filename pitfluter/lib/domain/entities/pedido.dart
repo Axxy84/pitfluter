@@ -8,8 +8,6 @@ enum TipoPedido {
 class Pedido extends Equatable {
   final int id;
   final String numero;
-  final int? clienteId;
-  final int? enderecoId;
   final int? mesaId;
   final double subtotal;
   final double taxaEntrega;
@@ -25,8 +23,6 @@ class Pedido extends Equatable {
   const Pedido({
     required this.id,
     required this.numero,
-    this.clienteId,
-    this.enderecoId,
     this.mesaId,
     required this.subtotal,
     required this.taxaEntrega,
@@ -49,8 +45,6 @@ class Pedido extends Equatable {
   Pedido copyWith({
     int? id,
     String? numero,
-    int? clienteId,
-    int? enderecoId,
     int? mesaId,
     double? subtotal,
     double? taxaEntrega,
@@ -66,8 +60,6 @@ class Pedido extends Equatable {
     return Pedido(
       id: id ?? this.id,
       numero: numero ?? this.numero,
-      clienteId: clienteId ?? this.clienteId,
-      enderecoId: enderecoId ?? this.enderecoId,
       mesaId: mesaId ?? this.mesaId,
       subtotal: subtotal ?? this.subtotal,
       taxaEntrega: taxaEntrega ?? this.taxaEntrega,
@@ -86,8 +78,6 @@ class Pedido extends Equatable {
   List<Object?> get props => [
         id,
         numero,
-        clienteId,
-        enderecoId,
         mesaId,
         subtotal,
         taxaEntrega,

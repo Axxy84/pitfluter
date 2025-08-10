@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HistoricoCaixasScreen extends StatefulWidget {
   const HistoricoCaixasScreen({super.key});
@@ -12,95 +13,171 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
   final formatoMoeda = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
   final formatoData = DateFormat('dd/MM/yyyy');
   final formatoHora = DateFormat('HH:mm');
-
-  // Dados mockados para demonstração
-  final List<Map<String, dynamic>> caixasMockados = [
-    {
-      'id': '1',
-      'numero': 'CX001',
-      'data': DateTime.now().subtract(const Duration(days: 1)),
-      'operador': 'João Silva',
-      'abertura': DateTime.now().subtract(const Duration(days: 1, hours: 14)),
-      'fechamento': DateTime.now().subtract(const Duration(days: 1, hours: 2)),
-      'totalVendas': 2450.00,
-      'diferenca': 2.50,
-    },
-    {
-      'id': '2',
-      'numero': 'CX002',
-      'data': DateTime.now().subtract(const Duration(days: 2)),
-      'operador': 'Maria Santos',
-      'abertura': DateTime.now().subtract(const Duration(days: 2, hours: 15)),
-      'fechamento': DateTime.now().subtract(const Duration(days: 2, hours: 1)),
-      'totalVendas': 1890.00,
-      'diferenca': -5.00,
-    },
-    {
-      'id': '3',
-      'numero': 'CX003',
-      'data': DateTime.now().subtract(const Duration(days: 3)),
-      'operador': 'Pedro Costa',
-      'abertura': DateTime.now().subtract(const Duration(days: 3, hours: 13)),
-      'fechamento': DateTime.now().subtract(const Duration(days: 3, hours: 3)),
-      'totalVendas': 3200.00,
-      'diferenca': 10.00,
-    },
+  final _supabase = Supabase.instance.client;
+  
+  List<Map<String, dynamic>> caixasHistorico = [];
+  bool isLoading = true;
+  String? selectedMonth;
+  String? selectedYear;
+  final TextEditingController _searchController = TextEditingController();
+  
+  final List<String> meses = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
   ];
+  
+  final List<String> anos = ['2025', '2024', '2023', '2022'];
+  
+  @override
+  void initState() {
+    super.initState();
+    selectedMonth = meses[DateTime.now().month - 1];
+    selectedYear = DateTime.now().year.toString();
+    _carregarHistorico();
+  }
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _carregarHistorico() async {
+    if (!mounted) return;
+    
+    setState(() {
+      isLoading = true;
+    });
+    
+    try {
+      // Buscar caixas fechados do Supabase
+      final response = await _supabase
+          .from('caixa')
+          .select()
+          .not('hora_fechamento', 'is', null)
+          .order('data_abertura', ascending: false);
+      
+      final List<Map<String, dynamic>> caixasProcessados = [];
+      
+      for (final caixa in response) {
+        final dataAbertura = DateTime.parse(caixa['data_abertura']);
+        final dataFechamento = caixa['hora_fechamento'] != null 
+            ? DateTime.parse(caixa['hora_fechamento']) 
+            : null;
+        
+        caixasProcessados.add({
+          'id': caixa['id'].toString(),
+          'numero': 'CX${caixa['id'].toString().padLeft(3, '0')}',
+          'data': dataAbertura,
+          'operador': caixa['operador_nome'] ?? 'Não informado',
+          'abertura': dataAbertura,
+          'fechamento': dataFechamento,
+          'valorInicial': (caixa['valor_inicial'] ?? 0).toDouble(),
+          'valorFinal': (caixa['valor_final'] ?? 0).toDouble(),
+          'totalVendas': (caixa['valor_vendas'] ?? 0).toDouble(),
+          'totalDinheiro': (caixa['valor_dinheiro'] ?? 0).toDouble(),
+          'totalCartao': (caixa['valor_cartao'] ?? 0).toDouble(),
+          'totalPix': (caixa['valor_pix'] ?? 0).toDouble(),
+          'diferenca': ((caixa['valor_final'] ?? 0) - (caixa['valor_inicial'] ?? 0) - (caixa['valor_vendas'] ?? 0)).toDouble(),
+        });
+      }
+      
+      if (!mounted) return;
+      
+      setState(() {
+        caixasHistorico = caixasProcessados;
+        isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() {
+        caixasHistorico = [];
+        isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao carregar histórico: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+  
+  List<Map<String, dynamic>> get caixasFiltrados {
+    var caixas = caixasHistorico;
+    
+    // Filtro por mês/ano
+    if (selectedMonth != null && selectedYear != null) {
+      final mesIndex = meses.indexOf(selectedMonth!) + 1;
+      final ano = int.tryParse(selectedYear!) ?? DateTime.now().year;
+      
+      caixas = caixas.where((caixa) {
+        final data = caixa['data'] as DateTime;
+        return data.month == mesIndex && data.year == ano;
+      }).toList();
+    }
+    
+    // Filtro por busca
+    final searchQuery = _searchController.text.toLowerCase();
+    if (searchQuery.isNotEmpty) {
+      caixas = caixas.where((caixa) {
+        final numero = caixa['numero'].toString().toLowerCase();
+        final operador = caixa['operador'].toString().toLowerCase();
+        return numero.contains(searchQuery) || operador.contains(searchQuery);
+      }).toList();
+    }
+    
+    return caixas;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Row(
           children: [
-            Icon(Icons.history, color: Colors.white),
+            Icon(Icons.history),
             SizedBox(width: 8),
-            Text(
-              'Histórico de Caixas',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('Histórico de Caixas'),
           ],
         ),
-        backgroundColor: const Color(0xFFDC2626),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+        centerTitle: false,
       ),
-      body: Column(
-        children: [
-          // Estatísticas no topo
-          _buildEstatisticas(),
-          
-          // Filtros
-          _buildFiltros(),
-          
-          // Lista de caixas
-          Expanded(
-            child: _buildListaCaixas(),
-          ),
-        ],
-      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // Estatísticas no topo
+                _buildEstatisticas(),
+                
+                // Filtros
+                _buildFiltros(),
+                
+                // Lista de caixas
+                Expanded(
+                  child: _buildListaCaixas(),
+                ),
+              ],
+            ),
     );
   }
 
   Widget _buildEstatisticas() {
-    final totalMes = caixasMockados.fold<double>(
+    final caixasFiltro = caixasFiltrados;
+    final totalMes = caixasFiltro.fold<double>(
       0, (sum, item) => sum + item['totalVendas'],
     );
-    final mediaDiaria = totalMes / caixasMockados.length;
-    final melhorDia = caixasMockados.fold<double>(
+    final mediaDiaria = caixasFiltro.isNotEmpty ? totalMes / caixasFiltro.length : 0;
+    final melhorDia = caixasFiltro.fold<double>(
       0, (max, item) => item['totalVendas'] > max ? item['totalVendas'] : max,
     );
 
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       child: Row(
         children: [
           Expanded(
@@ -133,7 +210,7 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
           Expanded(
             child: _buildCardEstatistica(
               'Dias Trabalhados',
-              '${caixasMockados.length}',
+              '${caixasFiltro.length}',
               Icons.calendar_today,
               Colors.purple,
             ),
@@ -187,7 +264,7 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
   Widget _buildFiltros() {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       child: Row(
         children: [
           Expanded(
@@ -198,13 +275,15 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
                 border: OutlineInputBorder(),
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
-              value: 'Janeiro',
-              items: const [
-                DropdownMenuItem(value: 'Janeiro', child: Text('Janeiro')),
-                DropdownMenuItem(value: 'Fevereiro', child: Text('Fevereiro')),
-                DropdownMenuItem(value: 'Março', child: Text('Março')),
-              ],
-              onChanged: (value) {},
+              value: selectedMonth,
+              items: meses.map((mes) => 
+                DropdownMenuItem(value: mes, child: Text(mes))
+              ).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedMonth = value;
+                });
+              },
             ),
           ),
           const SizedBox(width: 8),
@@ -216,18 +295,22 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
                 border: OutlineInputBorder(),
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
-              value: '2025',
-              items: const [
-                DropdownMenuItem(value: '2025', child: Text('2025')),
-                DropdownMenuItem(value: '2024', child: Text('2024')),
-              ],
-              onChanged: (value) {},
+              value: selectedYear,
+              items: anos.map((ano) => 
+                DropdownMenuItem(value: ano, child: Text(ano))
+              ).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedYear = value;
+                });
+              },
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             flex: 2,
             child: TextFormField(
+              controller: _searchController,
               decoration: const InputDecoration(
                 labelText: 'Buscar...',
                 hintText: 'Número do caixa, operador...',
@@ -235,6 +318,9 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
                 border: OutlineInputBorder(),
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
+              onChanged: (value) {
+                setState(() {});
+              },
             ),
           ),
         ],
@@ -243,11 +329,42 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
   }
 
   Widget _buildListaCaixas() {
+    final caixasFiltro = caixasFiltrados;
+    
+    if (caixasFiltro.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inbox_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Nenhum caixa encontrado',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tente alterar os filtros ou período',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: caixasMockados.length,
+      itemCount: caixasFiltro.length,
       itemBuilder: (context, index) {
-        final caixa = caixasMockados[index];
+        final caixa = caixasFiltro[index];
         return _buildCaixaCard(caixa);
       },
     );
@@ -280,10 +397,10 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
                     const SizedBox(width: 8),
                     Text(
                       '${formatoData.format(caixa['data'])} - ${caixa['numero']}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
@@ -291,15 +408,15 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    border: Border.all(color: Colors.green[300]!),
+                    color: Colors.green.withValues(alpha: 0.1),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(
+                  child: const Text(
                     'Fechado',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.green[700],
+                      color: Colors.green,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -311,11 +428,11 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
             // Informações do operador
             Row(
               children: [
-                Icon(Icons.person, color: Colors.grey[600], size: 16),
+                Icon(Icons.person, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 16),
                 const SizedBox(width: 8),
                 Text(
                   'Operador: ${caixa['operador']}',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -324,12 +441,12 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
             // Horários
             Row(
               children: [
-                Icon(Icons.access_time, color: Colors.grey[600], size: 16),
+                Icon(Icons.access_time, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 16),
                 const SizedBox(width: 8),
                 Text(
                   'Abertura: ${formatoHora.format(caixa['abertura'])} | '
-                  'Fechamento: ${formatoHora.format(caixa['fechamento'])}',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  'Fechamento: ${caixa['fechamento'] != null ? formatoHora.format(caixa['fechamento']) : 'N/A'}',
+                  style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -339,9 +456,9 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey[50],
+                color: Theme.of(context).colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[200]!),
+                border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -353,22 +470,22 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
                         'Total Vendas',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         formatoMoeda.format(caixa['totalVendas']),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
                     ],
                   ),
-                  Container(width: 1, height: 40, color: Colors.grey[300]),
+                  Container(width: 1, height: 40, color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3)),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -376,7 +493,7 @@ class _HistoricoCaixasScreenState extends State<HistoricoCaixasScreen> {
                         'Diferença',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                       ),

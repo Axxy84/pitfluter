@@ -7,8 +7,6 @@ void main() {
       final pedido = Pedido(
         id: 1,
         numero: '000001',
-        clienteId: 1,
-        enderecoId: 1,
         mesaId: null,
         subtotal: 25.90,
         taxaEntrega: 5.50,
@@ -24,8 +22,6 @@ void main() {
 
       expect(pedido.id, 1);
       expect(pedido.numero, '000001');
-      expect(pedido.clienteId, 1);
-      expect(pedido.enderecoId, 1);
       expect(pedido.subtotal, 25.90);
       expect(pedido.taxaEntrega, 5.50);
       expect(pedido.desconto, 2.00);
@@ -40,8 +36,6 @@ void main() {
       final pedido = Pedido(
         id: 2,
         numero: '000002',
-        clienteId: null,
-        enderecoId: null,
         mesaId: 5,
         subtotal: 18.50,
         taxaEntrega: 0.0,
@@ -56,8 +50,6 @@ void main() {
       );
 
       expect(pedido.mesaId, 5);
-      expect(pedido.clienteId, isNull);
-      expect(pedido.enderecoId, isNull);
       expect(pedido.tipo, TipoPedido.balcao);
       expect(pedido.taxaEntrega, 0.0);
     });
@@ -67,8 +59,6 @@ void main() {
       final pedido1 = Pedido(
         id: 1,
         numero: '000001',
-        clienteId: 1,
-        enderecoId: 1,
         mesaId: null,
         subtotal: 25.90,
         taxaEntrega: 5.50,
@@ -85,8 +75,6 @@ void main() {
       final pedido2 = Pedido(
         id: 1,
         numero: '000001',
-        clienteId: 1,
-        enderecoId: 1,
         mesaId: null,
         subtotal: 25.90,
         taxaEntrega: 5.50,
@@ -107,8 +95,6 @@ void main() {
       final pedido = Pedido(
         id: 1,
         numero: '000001',
-        clienteId: 1,
-        enderecoId: 1,
         mesaId: null,
         subtotal: 25.90,
         taxaEntrega: 5.50,
@@ -135,8 +121,6 @@ void main() {
       final pedido = Pedido(
         id: 1,
         numero: '000001',
-        clienteId: 1,
-        enderecoId: 1,
         mesaId: null,
         subtotal: 25.90,
         taxaEntrega: 5.50,

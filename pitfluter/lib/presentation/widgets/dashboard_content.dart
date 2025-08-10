@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key});
@@ -27,6 +28,16 @@ class _DashboardContentState extends State<DashboardContent>
   int clientesAtivos = 0;
   List<Map<String, dynamic>> pedidosRecentes = [];
   List<Map<String, dynamic>> produtosMaisVendidos = [];
+  
+  // Dados para gráficos
+  List<FlSpot> vendaSemanaSPots = [];
+  Map<String, double> formasPagamento = {};
+  List<Map<String, dynamic>> vendasPorHora = [];
+  
+  // Dados para mini gráficos dos cards
+  List<FlSpot> faturamentoSemanaSpots = [];
+  List<double> pedidosSemanaBars = [];
+  double ticketMedioAnterior = 0.0;
 
   final List<String> periods = ['Hoje', 'Semana', 'Mês'];
 
@@ -140,6 +151,9 @@ class _DashboardContentState extends State<DashboardContent>
         produtosMaisVendidos = [];
       }
       
+      // 6. Dados para gráficos
+      await _loadChartData(pedidos);
+      
     } catch (e) {
       // Erro ao carregar dados do dashboard
     }
@@ -147,6 +161,88 @@ class _DashboardContentState extends State<DashboardContent>
     setState(() {
       isLoading = false;
     });
+  }
+
+  Future<void> _loadChartData(List<Map<String, dynamic>> pedidos) async {
+    // 1. Vendas por hora (últimas 24 horas)
+    final vendasHora = <int, double>{};
+    for (int i = 0; i < 24; i++) {
+      vendasHora[i] = 0;
+    }
+    
+    for (var pedido in pedidos) {
+      if (pedido['created_at'] != null) {
+        final data = DateTime.parse(pedido['created_at']);
+        final hora = data.hour;
+        vendasHora[hora] = (vendasHora[hora] ?? 0) + (pedido['total'] ?? 0.0);
+      }
+    }
+    
+    vendasPorHora = vendasHora.entries.map((e) => {
+      'hora': e.key,
+      'valor': e.value,
+    }).toList();
+    
+    // 2. Formas de pagamento
+    formasPagamento = {
+      'Dinheiro': 0,
+      'Cartão': 0,
+      'PIX': 0,
+    };
+    
+    for (var pedido in pedidos) {
+      final forma = pedido['forma_pagamento']?.toString() ?? 'Dinheiro';
+      final valor = (pedido['total'] ?? 0.0).toDouble();
+      formasPagamento[forma] = (formasPagamento[forma] ?? 0) + valor;
+    }
+    
+    // 3. Vendas da semana (últimos 7 dias)
+    final now = DateTime.now();
+    vendaSemanaSPots = [];
+    faturamentoSemanaSpots = [];
+    pedidosSemanaBars = [];
+    
+    for (int i = 6; i >= 0; i--) {
+      final dia = now.subtract(Duration(days: i));
+      final inicioDia = DateTime(dia.year, dia.month, dia.day);
+      final fimDia = inicioDia.add(const Duration(days: 1));
+      
+      double totalDia = 0;
+      int pedidosDia = 0;
+      
+      for (var pedido in pedidos) {
+        if (pedido['created_at'] != null) {
+          final dataPedido = DateTime.parse(pedido['created_at']);
+          if (dataPedido.isAfter(inicioDia) && dataPedido.isBefore(fimDia)) {
+            totalDia += (pedido['total'] ?? 0.0).toDouble();
+            pedidosDia++;
+          }
+        }
+      }
+      
+      vendaSemanaSPots.add(FlSpot((6 - i).toDouble(), totalDia));
+      faturamentoSemanaSpots.add(FlSpot((6 - i).toDouble(), totalDia));
+      pedidosSemanaBars.add(pedidosDia.toDouble());
+    }
+    
+    // 4. Calcular ticket médio anterior (semana passada) para comparação
+    final semanaPassadaInicio = now.subtract(const Duration(days: 14));
+    final semanaPassadaFim = now.subtract(const Duration(days: 7));
+    
+    double totalSemanaPassada = 0;
+    int pedidosSemanaPassada = 0;
+    
+    for (var pedido in pedidos) {
+      if (pedido['created_at'] != null) {
+        final dataPedido = DateTime.parse(pedido['created_at']);
+        if (dataPedido.isAfter(semanaPassadaInicio) && dataPedido.isBefore(semanaPassadaFim)) {
+          totalSemanaPassada += (pedido['total'] ?? 0.0).toDouble();
+          pedidosSemanaPassada++;
+        }
+      }
+    }
+    
+    ticketMedioAnterior = pedidosSemanaPassada > 0 ? totalSemanaPassada / pedidosSemanaPassada : 0;
   }
 
   Future<void> _refreshData() async {
@@ -323,7 +419,7 @@ class _DashboardContentState extends State<DashboardContent>
               crossAxisCount: crossAxisCount,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
-              childAspectRatio: 1.5,
+              childAspectRatio: 1.3, // Ajustado para acomodar os mini gráficos
             ),
             itemCount: metrics.length,
             itemBuilder: (context, index) {
@@ -399,6 +495,14 @@ class _DashboardContentState extends State<DashboardContent>
                     ),
                 ],
               ),
+              
+              // Mini chart area
+              if (_shouldShowMiniChart(metric.title))
+                SizedBox(
+                  height: 40,
+                  child: _buildMiniChart(metric.title, colorScheme),
+                ),
+              
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -426,85 +530,551 @@ class _DashboardContentState extends State<DashboardContent>
       ),
     );
   }
-
-  Widget _buildChartsRow(ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Row(
-        children: [
-          // Produtos mais vendidos
-          Expanded(
-            child: Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Produtos Mais Vendidos',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        Icon(
-                          Icons.pie_chart,
-                          color: colorScheme.primary,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    if (produtosMaisVendidos.isEmpty)
-                      Center(
-                        child: Text(
-                          'Nenhum produto vendido no período',
-                          style: TextStyle(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      )
-                    else
-                      ...produtosMaisVendidos.map((produto) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                produto['nome'],
-                                style: TextStyle(
-                                  color: colorScheme.onSurface,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Text(
-                              '${produto['quantidade']}x',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )),
-                  ],
-                ),
+  
+  bool _shouldShowMiniChart(String title) {
+    return title.contains('Faturamento') || 
+           title.contains('Pedidos');
+  }
+  
+  Widget _buildMiniChart(String title, ColorScheme colorScheme) {
+    if (title.contains('Faturamento')) {
+      return _buildMiniLineChart(colorScheme);
+    } else if (title.contains('Pedidos')) {
+      return _buildMiniBarChart(colorScheme);
+    }
+    return Container();
+  }
+  
+  Widget _buildMiniLineChart(ColorScheme colorScheme) {
+    if (faturamentoSemanaSpots.isEmpty) return Container();
+    
+    return LineChart(
+      LineChartData(
+        gridData: const FlGridData(show: false),
+        titlesData: const FlTitlesData(show: false),
+        borderData: FlBorderData(show: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: faturamentoSemanaSpots,
+            isCurved: true,
+            gradient: LinearGradient(
+              colors: [
+                Colors.green,
+                Colors.green.withValues(alpha: 0.3),
+              ],
+            ),
+            barWidth: 2,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.green.withValues(alpha: 0.2),
+                  Colors.green.withValues(alpha: 0.0),
+                ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+  
+  Widget _buildMiniBarChart(ColorScheme colorScheme) {
+    if (pedidosSemanaBars.isEmpty) return Container();
+    
+    final maxValue = pedidosSemanaBars.reduce((a, b) => a > b ? a : b);
+    if (maxValue == 0) return Container();
+    
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: maxValue * 1.2,
+        gridData: const FlGridData(show: false),
+        titlesData: const FlTitlesData(show: false),
+        borderData: FlBorderData(show: false),
+        barGroups: pedidosSemanaBars.asMap().entries.map((entry) {
+          return BarChartGroupData(
+            x: entry.key,
+            barRods: [
+              BarChartRodData(
+                toY: entry.value,
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.blue,
+                    Colors.blue.withValues(alpha: 0.7),
+                  ],
+                ),
+                width: 8,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(2),
+                  topRight: Radius.circular(2),
+                ),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+  
+
+  Widget _buildChartsRow(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth > 1200;
+          
+          if (isWide) {
+            return Row(
+              children: [
+                Expanded(child: _buildSalesLineChart(colorScheme)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildPaymentMethodsChart(colorScheme)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildHourlySalesChart(colorScheme)),
+              ],
+            );
+          } else {
+            return Column(
+              children: [
+                _buildSalesLineChart(colorScheme),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(child: _buildPaymentMethodsChart(colorScheme)),
+                    const SizedBox(width: 16),
+                    Expanded(child: _buildHourlySalesChart(colorScheme)),
+                  ],
+                ),
+              ],
+            );
+          }
+        },
+      ),
+    );
+  }
+  
+  Widget _buildSalesLineChart(ColorScheme colorScheme) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Vendas da Semana',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                Icon(
+                  Icons.show_chart,
+                  color: colorScheme.primary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 200,
+              child: vendaSemanaSPots.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Sem dados para exibir',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      ),
+                    )
+                  : LineChart(
+                      LineChartData(
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          getDrawingHorizontalLine: (value) => FlLine(
+                            color: colorScheme.outline.withValues(alpha: 0.2),
+                            strokeWidth: 1,
+                          ),
+                        ),
+                        titlesData: FlTitlesData(
+                          show: true,
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 30,
+                              interval: 1,
+                              getTitlesWidget: (value, meta) {
+                                const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+                                final index = value.toInt();
+                                if (index >= 0 && index < dias.length) {
+                                  return SideTitleWidget(
+                                    axisSide: meta.axisSide,
+                                    child: Text(
+                                      dias[index],
+                                      style: TextStyle(
+                                        color: colorScheme.onSurfaceVariant,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return Container();
+                              },
+                            ),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              interval: null,
+                              reservedSize: 60,
+                              getTitlesWidget: (value, meta) {
+                                return SideTitleWidget(
+                                  axisSide: meta.axisSide,
+                                  child: Text(
+                                    'R\$ ${value.toInt()}',
+                                    style: TextStyle(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        borderData: FlBorderData(
+                          show: true,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: colorScheme.outline.withValues(alpha: 0.3),
+                            ),
+                            left: BorderSide(
+                              color: colorScheme.outline.withValues(alpha: 0.3),
+                            ),
+                          ),
+                        ),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: vendaSemanaSPots,
+                            isCurved: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                colorScheme.primary,
+                                colorScheme.primary.withValues(alpha: 0.3),
+                              ],
+                            ),
+                            barWidth: 3,
+                            isStrokeCapRound: true,
+                            dotData: FlDotData(
+                              show: true,
+                              getDotPainter: (spot, percent, barData, index) =>
+                                  FlDotCirclePainter(
+                                    radius: 4,
+                                    color: colorScheme.primary,
+                                    strokeWidth: 2,
+                                    strokeColor: colorScheme.surface,
+                                  ),
+                            ),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  colorScheme.primary.withValues(alpha: 0.2),
+                                  colorScheme.primary.withValues(alpha: 0.0),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildPaymentMethodsChart(ColorScheme colorScheme) {
+    final total = formasPagamento.values.fold(0.0, (sum, value) => sum + value);
+    
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Formas de Pagamento',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                Icon(
+                  Icons.pie_chart,
+                  color: colorScheme.primary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 200,
+              child: total == 0
+                  ? Center(
+                      child: Text(
+                        'Sem dados para exibir',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      ),
+                    )
+                  : PieChart(
+                      PieChartData(
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 60,
+                        startDegreeOffset: -90,
+                        sections: formasPagamento.entries.map((entry) {
+                          final percentage = (entry.value / total * 100);
+                          final colors = [
+                            Colors.green,
+                            Colors.blue,
+                            Colors.purple,
+                          ];
+                          final colorIndex = formasPagamento.keys.toList().indexOf(entry.key);
+                          
+                          return PieChartSectionData(
+                            color: colors[colorIndex % colors.length],
+                            value: entry.value,
+                            title: '${percentage.toStringAsFixed(1)}%',
+                            radius: 50,
+                            titleStyle: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+            ),
+            const SizedBox(height: 16),
+            ...formasPagamento.entries.map((entry) {
+              final colors = [Colors.green, Colors.blue, Colors.purple];
+              final colorIndex = formasPagamento.keys.toList().indexOf(entry.key);
+              
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: colors[colorIndex % colors.length],
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(entry.key)),
+                    Text(
+                      'R\$ ${entry.value.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildHourlySalesChart(ColorScheme colorScheme) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Vendas por Hora',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                Icon(
+                  Icons.bar_chart,
+                  color: colorScheme.primary,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 200,
+              child: vendasPorHora.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Sem dados para exibir',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      ),
+                    )
+                  : BarChart(
+                      BarChartData(
+                        alignment: BarChartAlignment.spaceAround,
+                        maxY: vendasPorHora.map((e) => e['valor'] as double).reduce((a, b) => a > b ? a : b) * 1.2,
+                        barTouchData: BarTouchData(
+                          touchTooltipData: BarTouchTooltipData(
+                            tooltipBgColor: colorScheme.inverseSurface,
+                            tooltipHorizontalAlignment: FLHorizontalAlignment.center,
+                            tooltipMargin: 10,
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              final hora = group.x.toInt();
+                              final valor = rod.toY;
+                              return BarTooltipItem(
+                                '${hora}h\nR\$ ${valor.toStringAsFixed(2)}',
+                                TextStyle(
+                                  color: colorScheme.onInverseSurface,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        titlesData: FlTitlesData(
+                          show: true,
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 30,
+                              interval: 4,
+                              getTitlesWidget: (value, meta) {
+                                return SideTitleWidget(
+                                  axisSide: meta.axisSide,
+                                  child: Text(
+                                    '${value.toInt()}h',
+                                    style: TextStyle(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              getTitlesWidget: (value, meta) {
+                                return SideTitleWidget(
+                                  axisSide: meta.axisSide,
+                                  child: Text(
+                                    'R\$${value.toInt()}',
+                                    style: TextStyle(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontSize: 9,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        borderData: FlBorderData(
+                          show: true,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: colorScheme.outline.withValues(alpha: 0.3),
+                            ),
+                            left: BorderSide(
+                              color: colorScheme.outline.withValues(alpha: 0.3),
+                            ),
+                          ),
+                        ),
+                        barGroups: vendasPorHora.map((venda) {
+                          final hora = venda['hora'] as int;
+                          final valor = venda['valor'] as double;
+                          
+                          return BarChartGroupData(
+                            x: hora,
+                            barRods: [
+                              BarChartRodData(
+                                toY: valor,
+                                gradient: LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [
+                                    colorScheme.primary,
+                                    colorScheme.primary.withValues(alpha: 0.7),
+                                  ],
+                                ),
+                                width: 8,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(4),
+                                  topRight: Radius.circular(4),
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          getDrawingHorizontalLine: (value) => FlLine(
+                            color: colorScheme.outline.withValues(alpha: 0.2),
+                            strokeWidth: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -630,3 +1200,4 @@ class _MetricData {
     required this.isPositive,
   });
 }
+

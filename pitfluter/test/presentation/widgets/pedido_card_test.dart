@@ -11,7 +11,6 @@ void main() {
       mockPedido = Pedido(
         id: 1,
         numero: 'PED001',
-        clienteId: 1,
         subtotal: 25.90,
         taxaEntrega: 5.00,
         desconto: 0.00,

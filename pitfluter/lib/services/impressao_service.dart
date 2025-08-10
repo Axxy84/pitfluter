@@ -18,23 +18,19 @@ class ImpressaoService {
   static Future<bool> imprimirComanda({
     required String numeroPedido,
     required DateTime dataPedido,
-    required String nomeCliente,
-    String? telefoneCliente,
-    String? enderecoCliente,
     required List<Map<String, dynamic>> itens,
     required double subtotal,
     required double taxaEntrega,
     required double total,
     String? formaPagamento,
     String? observacoesPedido,
+    String? informacoesEntrega,
   }) async {
     try {
       final pdf = await _gerarPdfComanda(
         numeroPedido: numeroPedido,
         dataPedido: dataPedido,
-        nomeCliente: nomeCliente,
-        telefoneCliente: telefoneCliente,
-        enderecoCliente: enderecoCliente,
+        informacoesEntrega: informacoesEntrega,
         itens: itens,
         subtotal: subtotal,
         taxaEntrega: taxaEntrega,
@@ -67,23 +63,19 @@ class ImpressaoService {
   static Future<bool> compartilharComanda({
     required String numeroPedido,
     required DateTime dataPedido,
-    required String nomeCliente,
-    String? telefoneCliente,
-    String? enderecoCliente,
     required List<Map<String, dynamic>> itens,
     required double subtotal,
     required double taxaEntrega,
     required double total,
     String? formaPagamento,
     String? observacoesPedido,
+    String? informacoesEntrega,
   }) async {
     try {
       final pdf = await _gerarPdfComanda(
         numeroPedido: numeroPedido,
         dataPedido: dataPedido,
-        nomeCliente: nomeCliente,
-        telefoneCliente: telefoneCliente,
-        enderecoCliente: enderecoCliente,
+        informacoesEntrega: informacoesEntrega,
         itens: itens,
         subtotal: subtotal,
         taxaEntrega: taxaEntrega,
@@ -110,15 +102,13 @@ class ImpressaoService {
   static Future<Uint8List> _gerarPdfComanda({
     required String numeroPedido,
     required DateTime dataPedido,
-    required String nomeCliente,
-    String? telefoneCliente,
-    String? enderecoCliente,
     required List<Map<String, dynamic>> itens,
     required double subtotal,
     required double taxaEntrega,
     required double total,
     String? formaPagamento,
     String? observacoesPedido,
+    String? informacoesEntrega,
   }) async {
     final pdf = pw.Document();
 
@@ -177,17 +167,13 @@ class ImpressaoService {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Flexible(
-                    child: pw.Text(
-                      'Cliente: $nomeCliente',
-                      style: pw.TextStyle(font: fonte, fontSize: 9),
-                      overflow: pw.TextOverflow.clip,
-                    ),
-                  ),
-                  if (telefoneCliente != null && telefoneCliente.isNotEmpty)
-                    pw.Text(
-                      'Tel: $telefoneCliente',
-                      style: pw.TextStyle(font: fonte, fontSize: 9),
+                  if (informacoesEntrega != null && informacoesEntrega.isNotEmpty)
+                    pw.Flexible(
+                      child: pw.Text(
+                        'Entrega: $informacoesEntrega',
+                        style: pw.TextStyle(font: fonte, fontSize: 9),
+                        overflow: pw.TextOverflow.clip,
+                      ),
                     ),
                 ],
               ),
@@ -267,14 +253,6 @@ class ImpressaoService {
                   ),
                 ),
 
-              if (enderecoCliente != null && enderecoCliente.isNotEmpty)
-                pw.Center(
-                  child: pw.Text(
-                    'End: $enderecoCliente',
-                    style: pw.TextStyle(font: fonte, fontSize: 8),
-                    textAlign: pw.TextAlign.center,
-                  ),
-                ),
 
               pw.Center(
                 child: pw.Text(
@@ -364,12 +342,12 @@ class ImpressaoService {
       await imprimirComanda(
         numeroPedido: 'Mesa ${mesa['numero']}',
         dataPedido: DateTime.now(),
-        nomeCliente: 'Mesa ${mesa['numero']}',
         itens: todosItens,
         subtotal: total,
         taxaEntrega: 0,
         total: total,
         observacoesPedido: 'Conta da Mesa',
+        informacoesEntrega: 'Mesa ${mesa['numero']}',
       );
       
       return true;

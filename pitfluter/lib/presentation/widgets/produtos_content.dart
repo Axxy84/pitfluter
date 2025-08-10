@@ -674,20 +674,19 @@ class _ProdutoCard extends StatelessWidget {
                           ),
                         ),
                         const Spacer(),
-                        IconButton(
+                        ElevatedButton.icon(
                           onPressed: () {
                             _showEditPricesDialog(context, produto, tamanhos);
                           },
-                          icon: Icon(
+                          icon: const Icon(
                             Icons.edit,
-                            size: 18,
-                            color: colorScheme.primary,
+                            size: 16,
                           ),
-                          tooltip: 'Editar Preços',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
+                          label: const Text('Editar Preços'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                         ),
                       ],
@@ -740,7 +739,7 @@ class _ProdutoCard extends StatelessWidget {
                 children: [
                   Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
-                  Expanded(
+                  const Expanded(
                     child: Text(
                       'Editar Preços',
                       style: TextStyle(fontSize: 18),
@@ -763,12 +762,12 @@ class _ProdutoCard extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.local_pizza, size: 20),
+                          const Icon(Icons.local_pizza, size: 20),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               produto['nome'] ?? '',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
@@ -826,7 +825,7 @@ class _ProdutoCard extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.info, size: 16, color: Colors.orange),
+                            const Icon(Icons.info, size: 16, color: Colors.orange),
                             const SizedBox(width: 8),
                             Text(
                               'Há alterações não salvas',
@@ -905,7 +904,7 @@ class _ProdutoCard extends StatelessWidget {
                             SnackBar(
                               content: Text('Preços de "${produto['nome']}" atualizados com sucesso!'),
                               backgroundColor: Colors.green,
-                              duration: Duration(seconds: 2),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                           

@@ -1,9 +1,7 @@
 export 'caixa.dart';
 export 'categoria.dart';
-export 'cliente.dart';
 export 'configuracao_pedido.dart';
 export 'conta_pagar.dart';
-export 'endereco.dart';
 export 'ingrediente.dart';
 export 'item_pedido.dart';
 export 'mesa.dart';

@@ -26,18 +26,16 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   final Map<int, TextEditingController> _observacoesItemControllers = {};
 
   String _tipoPedido = 'delivery';
-  String? _produtoSelecionado;
-  String _tamanhoSelecionado = 'M';
-  bool _doisSabores = false;
-  String? _sabor1;
-  String? _sabor2;
-  int _quantidade = 1;
   int _mesaSelecionada = 1;
 
   // Variáveis para forma de pagamento
   String _formaPagamento = 'dinheiro';
   final TextEditingController _valorPagoController = TextEditingController();
   double _troco = 0.0;
+  
+  // Estado de seleção intuitiva para multi-sabores
+  final Map<String, Map<String, dynamic>> _selecoesAtuais = {}; // key: tamanho, value: {pizzas: [nomes], preco: double}
+  String? _tamanhoSelecionandoAtual;
 
   final List<Map<String, dynamic>> _carrinho = [];
   double _subtotal = 0.0;
@@ -85,6 +83,301 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       controller.dispose();
     }
     super.dispose();
+  }
+  
+  /// Limpa seleções atuais
+  void _limparSelecoes() {
+    setState(() {
+      _selecoesAtuais.clear();
+      _tamanhoSelecionandoAtual = null;
+    });
+  }
+  
+  /// Obtém o estado de seleção de um botão de preço
+  String _getEstadoSelecao(String nomePizza, String tamanho) {
+    final selecao = _selecoesAtuais[tamanho];
+    if (selecao == null) return 'none';
+    
+    final pizzas = selecao['pizzas'] as List<String>;
+    if (pizzas.contains(nomePizza)) {
+      return pizzas.length == 1 ? 'single' : 'multi';
+    }
+    return 'none';
+  }
+  
+  /// Processa clique em um botão de preço
+  void _processarClique(String nomePizza, String ingredientes, String tamanho, double preco, bool isDelivery) {
+    final maxSabores = tamanho == 'F' ? 3 : 2;
+    
+    HapticFeedback.lightImpact(); // Feedback tátil
+    
+    setState(() {
+      // Se não há seleção para este tamanho, criar nova
+      if (!_selecoesAtuais.containsKey(tamanho)) {
+        _selecoesAtuais[tamanho] = {
+          'pizzas': [nomePizza],
+          'preco_base': preco,
+          'is_delivery': isDelivery,
+          'ingredientes': {nomePizza: ingredientes},
+        };
+        _tamanhoSelecionandoAtual = tamanho;
+      } else {
+        final selecao = _selecoesAtuais[tamanho]!;
+        final pizzas = selecao['pizzas'] as List<String>;
+        final ingredientesMap = selecao['ingredientes'] as Map<String, String>;
+        
+        if (pizzas.contains(nomePizza)) {
+          // Se já está selecionada, remover
+          pizzas.remove(nomePizza);
+          ingredientesMap.remove(nomePizza);
+          
+          // Se não sobrou nenhuma pizza, remover a seleção
+          if (pizzas.isEmpty) {
+            _selecoesAtuais.remove(tamanho);
+            _tamanhoSelecionandoAtual = null;
+          }
+        } else {
+          // Adicionar nova pizza se não exceder o limite
+          if (pizzas.length < maxSabores) {
+            pizzas.add(nomePizza);
+            ingredientesMap[nomePizza] = ingredientes;
+            
+            // Atualizar preço baseado no maior preço selecionado
+            double maiorPreco = preco;
+            
+            // Encontrar o maior preço entre as pizzas selecionadas
+            for (final pizzaNome in pizzas) {
+              // Para delivery Grande, sempre R$ 40
+              if (isDelivery && tamanho == 'G') {
+                maiorPreco = 40.0;
+                break;
+              }
+              
+              // Para outras pizzas, buscar o preço no produto
+              final produtos = _produtosAtuais;
+              final produto = produtos.firstWhere(
+                (p) => p['nome'] == pizzaNome,
+                orElse: () => {'precosMap': <String, double>{}},
+              );
+              final precosMap = produto['precosMap'] as Map<String, double>? ?? {};
+              final precoSabor = precosMap[tamanho] ?? preco;
+              if (precoSabor > maiorPreco) {
+                maiorPreco = precoSabor;
+              }
+            }
+            
+            selecao['preco_base'] = maiorPreco;
+          } else {
+            // Mostrar aviso de limite
+            HapticFeedback.mediumImpact();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Máximo $maxSabores sabores para tamanho ${_getNomeTamanho(tamanho)}'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+            return; // Sair sem atualizar estado
+          }
+        }
+      }
+    });
+    
+    // Se há seleção ativa, mostrar botão de confirmação
+    if (_selecoesAtuais.containsKey(tamanho)) {
+      _mostrarBotaoConfirmacao(tamanho);
+    }
+  }
+  
+  /// Obtém cor de fundo baseada no estado de seleção
+  Color _getCorSelecao(String estado, bool isDelivery) {
+    switch (estado) {
+      case 'single':
+        return isDelivery ? Colors.green.withValues(alpha: 0.3) : Colors.blue.withValues(alpha: 0.3);
+      case 'multi':
+        return Colors.orange.withValues(alpha: 0.3);
+      default:
+        return isDelivery ? Colors.green.withValues(alpha: 0.1) : Theme.of(context).primaryColor.withValues(alpha: 0.1);
+    }
+  }
+  
+  /// Obtém cor da borda baseada no estado de seleção
+  Color _getCorBordaSelecao(String estado, bool isDelivery) {
+    switch (estado) {
+      case 'single':
+        return isDelivery ? Colors.green : Colors.blue;
+      case 'multi':
+        return Colors.orange;
+      default:
+        return isDelivery ? Colors.green : Theme.of(context).primaryColor;
+    }
+  }
+  
+  /// Obtém cor do texto baseada no estado de seleção
+  Color _getCorTextoSelecao(String estado, bool isDelivery) {
+    switch (estado) {
+      case 'single':
+        return isDelivery ? Colors.green : Colors.blue;
+      case 'multi':
+        return Colors.orange;
+      default:
+        return isDelivery ? Colors.green : Theme.of(context).primaryColor;
+    }
+  }
+  
+  /// Mostra botão flutuante de confirmação para o tamanho selecionado
+  void _mostrarBotaoConfirmacao(String tamanho) {
+    setState(() {
+      _tamanhoSelecionandoAtual = tamanho;
+    });
+    
+    // Timer para remover destaque do botão
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && _tamanhoSelecionandoAtual == tamanho) {
+        setState(() {
+          _tamanhoSelecionandoAtual = null;
+        });
+      }
+    });
+  }
+  
+  /// Modal super simplificado
+  void _mostrarModalConfirmacao(String tamanho) {
+    final selecao = _selecoesAtuais[tamanho]!;
+    final pizzas = selecao['pizzas'] as List<String>;
+    final precoBase = selecao['preco_base'] as double;
+    
+    int quantidade = 1;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final precoTotal = precoBase * quantidade;
+            final nomePizza = pizzas.length == 1 ? pizzas.first : pizzas.join(' + ');
+            
+            return AlertDialog(
+              title: Text(
+                pizzas.length == 1 ? 'Pizza Inteira' : 'Pizza Mista',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Pizza e tamanho
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      '$nomePizza (${_getNomeTamanho(tamanho)})',
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Quantidade
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      const Text('Qtd:', style: TextStyle(fontSize: 18)),
+                      IconButton(
+                        onPressed: quantidade > 1 ? () => setModalState(() => quantidade--) : null,
+                        icon: const Icon(Icons.remove_circle, size: 24),
+                      ),
+                      Text(
+                        quantidade.toString(),
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        onPressed: () => setModalState(() => quantidade++),
+                        icon: const Icon(Icons.add_circle, size: 24),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Total
+                  Text(
+                    'Total: R\$ ${precoTotal.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _limparSelecoes();
+                  },
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    _adicionarSelecaoAoCarrinho(tamanho, quantidade, precoTotal);
+                    Navigator.pop(context);
+                    _limparSelecoes();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Adicionar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+  
+  /// Adiciona a seleção atual ao carrinho
+  void _adicionarSelecaoAoCarrinho(String tamanho, int quantidade, double precoTotal) {
+    final selecao = _selecoesAtuais[tamanho]!;
+    final pizzas = selecao['pizzas'] as List<String>;
+    final precoUnitario = precoTotal / quantidade;
+    
+    HapticFeedback.lightImpact();
+    
+    String descricao;
+    if (pizzas.length == 1) {
+      descricao = '${pizzas.first} $tamanho';
+    } else {
+      descricao = '${pizzas.join(' + ')} $tamanho';
+    }
+    
+    final item = {
+      'nome': pizzas.first,
+      'descricao': descricao,
+      'preco': precoUnitario,
+      'quantidade': quantidade,
+      'total': precoTotal,
+      'observacao': '',
+    };
+    
+    setState(() {
+      _carrinho.add(item);
+      _calcularSubtotal();
+    });
+    
+    // Confirmação
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$descricao adicionado ao carrinho!'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _carregarProdutos() async {
@@ -249,29 +542,45 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           }).toList();
           break;
         case 1:
-          // Pizzas normais - excluir pizzas delivery
+          // Pizzas normais - APENAS pizzas, excluindo delivery e bebidas
           produtos = _produtosBanco.where((p) {
             final categoria = p['categoriaNome'].toString().toLowerCase();
-            final tipoProduto = p['tipoProduto'].toString().toLowerCase();
-            final nomeProduto = p['nome'].toString().toLowerCase();
-
-            // Palavras-chave para pizzas (mesmo critério da tela produtos)
-            final palavrasChavePizza = [
-              'pizza',
-              'pizzas especiais',
+            
+            // Filtro MUITO específico: apenas categorias que são claramente pizzas
+            final categoriasPizzasPermitidas = [
               'pizzas salgadas',
-              'pizzas doces'
+              'pizzas doces', 
+              'pizzas especiais',
+              'pizza tradicional',
+              'pizza salgada',
+              'pizza doce',
+              'pizzas'
             ];
-
-            final isPizza = palavrasChavePizza.any((palavra) =>
-                categoria.contains(palavra.toLowerCase()) ||
-                tipoProduto.contains(palavra.toLowerCase()) ||
-                nomeProduto.contains('pizza'));
             
-            // Excluir pizzas delivery
-            final isDelivery = categoria.contains('pizza delivery');
+            // Primeiro: verificar se está numa categoria de pizza permitida
+            final isCategoriaPizza = categoriasPizzasPermitidas.any((catPizza) =>
+                categoria == catPizza || categoria.contains(catPizza));
             
-            return isPizza && !isDelivery;
+            // Segundo: excluir explicitamente delivery
+            final isDelivery = categoria.contains('delivery');
+            
+            // Terceiro: excluir explicitamente bebidas/outros
+            final categoriasProibidas = [
+              'bebida',
+              'bebidas',
+              'refrigerante', 
+              'suco',
+              'borda',
+              'bordas',
+              'sobremesa',
+              'sobremesas'
+            ];
+            
+            final isCategoriaProibida = categoriasProibidas.any((catProibida) =>
+                categoria.contains(catProibida));
+            
+            // Retornar apenas se: É pizza E não é delivery E não é categoria proibida
+            return isCategoriaPizza && !isDelivery && !isCategoriaProibida;
           }).toList();
           break;
         case 2:
@@ -352,7 +661,6 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     return produtos;
   }
 
-  bool get _isPizza => _tabController.index == 0 || _tabController.index == 1; // Pizza Delivery ou Pizzas normais
 
   double get _taxaEntrega {
     switch (_tipoPedido) {
@@ -387,130 +695,12 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     }
   }
 
-  List<String> _getTamanhosDisponiveis() {
-    if (_produtoSelecionado == null) return ['P', 'M', 'G', 'F'];
 
-    // Verificar se é pizza delivery
-    final produtos = _produtosAtuais;
-    final produto =
-        produtos.where((p) => p['nome'] == _produtoSelecionado).firstOrNull;
-    if (produto != null) {
-      final categoriaNome = produto['categoriaNome'] ?? '';
-      final isPizzaDelivery = categoriaNome.toLowerCase().contains('delivery');
-
-      if (isPizzaDelivery) {
-        // Pizza Delivery só tem tamanho Grande (G)
-        return ['G'];
-      }
-    }
-
-    // Outras pizzas têm todos os tamanhos
-    return ['P', 'M', 'G', 'F'];
-  }
-
-  /// Função otimizada para obter o maior preço entre dois sabores de pizza
-  /// Implementa a regra padrão de pizzarias: pizza meio-a-meio cobra pelo sabor mais caro
-  double _obterMaiorPreco(double preco1, double preco2) {
-    return preco1 >= preco2 ? preco1 : preco2;
-  }
-
-  /// Função para atualizar o preço automaticamente quando selecionado sabores
-  /// Força o recálculo do preço na tela em tempo real
-  void _atualizarPrecoAutomatico() {
-    // Esta função força o rebuild da tela para mostrar o novo preço calculado
-    // O preço é calculado automaticamente na função _calcularPreco()
-    // Aqui podemos adicionar lógicas adicionais se necessário
-  }
-
-  /// Função otimizada para calcular preço das pizzas considerando sabores múltiplos
-  double _calcularPreco() {
-    if (_produtoSelecionado == null) return 0.0;
-
-    final produtos = _produtosAtuais;
-    final produto =
-        produtos.where((p) => p['nome'] == _produtoSelecionado).firstOrNull;
-    if (produto == null) return 0.0;
-
-    if (_isPizza) {
-      // Verificar se é pizza delivery (R$ 40,00 apenas para tamanho médio)
-      final categoriaNome = produto['categoriaNome'] ?? '';
-      final isPizzaDelivery = categoriaNome.toLowerCase().contains('delivery');
-
-      if (isPizzaDelivery) {
-        // Pizza Delivery SEMPRE R$ 40,00 (só tem tamanho Grande disponível)
-        return 40.0 * _quantidade;
-      } else {
-        // Usar preços específicos do banco de dados
-        final precosMap = produto['precosMap'] as Map<String, double>? ?? {};
-        double preco1 = precosMap[_tamanhoSelecionado] ?? 
-                       (produto['preco'] as num).toDouble();
-
-        if (_doisSabores && _sabor2 != null && _sabor2!.isNotEmpty) {
-          // Buscar o produto da segunda pizza
-          final produto2 =
-              produtos.where((p) => p['nome'] == _sabor2).firstOrNull;
-          if (produto2 != null) {
-            final precosMap2 = produto2['precosMap'] as Map<String, double>? ?? {};
-            double preco2 = precosMap2[_tamanhoSelecionado] ?? 
-                           (produto2['preco'] as num).toDouble();
-
-            // OTIMIZAÇÃO: Sempre cobrar o MAIOR preço entre os 2 sabores
-            // Esta é a regra padrão de pizzarias: pizza meio-a-meio cobra pelo sabor mais caro
-            double precoFinal = _obterMaiorPreco(preco1, preco2);
-
-            return precoFinal * _quantidade;
-          }
-        }
-
-        return preco1 * _quantidade;
-      }
-    }
-
-    // Para produtos que não são pizza, usar preço base
-    return (produto['preco'] as num).toDouble() * _quantidade;
-  }
-
-  void _adicionarAoCarrinho() {
-    if (_produtoSelecionado == null) return;
-
-    HapticFeedback.lightImpact();
-
-    String descricao = _produtoSelecionado!;
-    if (_isPizza) {
-      descricao += ' $_tamanhoSelecionado';
-      if (_doisSabores && _sabor2 != null) {
-        descricao += ' (½ $_produtoSelecionado + ½ $_sabor2)';
-      }
-    }
-
-    final item = {
-      'nome': _produtoSelecionado!,
-      'descricao': descricao,
-      'preco': _calcularPreco() / _quantidade,
-      'quantidade': _quantidade,
-      'total': _calcularPreco(),
-      'observacao': '', // Campo para observações do item
-    };
-
-    setState(() {
-      _carrinho.add(item);
-      _calcularSubtotal();
-      _limparSelecao();
-    });
-  }
 
   void _calcularSubtotal() {
     _subtotal = _carrinho.fold(0.0, (sum, item) => sum + item['total']);
   }
 
-  void _limparSelecao() {
-    _produtoSelecionado = null;
-    _tamanhoSelecionado = 'M';
-    _doisSabores = false;
-    _sabor1 = null;
-    _sabor2 = null;
-    _quantidade = 1;
-  }
 
   void _removerDoCarrinho(int index) {
     HapticFeedback.lightImpact();
@@ -661,13 +851,53 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       body: Column(
         children: [
           _buildHeader(),
+          // Banner de instruções se houver seleções ativas
+          if (_selecoesAtuais.isNotEmpty) _buildBannerInstrucoes(),
           Expanded(
             child: Row(
               children: [
                 _buildColunaSelecao(),
-                _buildColunaConfiguracao(),
                 _buildColunaCarrinho(),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Banner com instruções para o sistema intuitivo
+  Widget _buildBannerInstrucoes() {
+    final totalSelecoes = _selecoesAtuais.length;
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF2196F3), Color(0xFF42A5F5)],
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.touch_app, color: Colors.white, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$totalSelecoes seleção(s) ativa(s). Clique no ✓ verde ou no preço novamente para confirmar.',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _limparSelecoes,
+            child: const Text(
+              'Limpar',
+              style: TextStyle(color: Colors.white),
             ),
           ),
         ],
@@ -692,7 +922,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           const Text(
             'Novo Pedido #000123',
             style: TextStyle(
-              fontSize: 20,
+              fontSize: 22,
               fontWeight: FontWeight.w600,
               color: Colors.black,
             ),
@@ -717,7 +947,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           Text(
             'Total: R\$ ${(_subtotal + _taxaEntrega).toStringAsFixed(2)}',
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
               color: Colors.red,
             ),
@@ -729,18 +959,33 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
 
   Widget _buildColunaSelecao() {
     return Expanded(
-      flex: 45, // Aumentado de 40% para 45%
+      flex: 70, // Aumentado para ocupar mais espaço sem a coluna central
       child: Container(
         decoration: const BoxDecoration(
           border: Border(right: BorderSide(color: Colors.grey, width: 0.5)),
         ),
         child: Column(
           children: [
+            // Seção fixa no topo (seletor de tipo)
             _buildSeletorTipoPedido(),
-            _buildCamposEspecificos(),
-            _buildTabs(),
-            _buildBuscaProduto(),
-            Expanded(child: _buildGridProdutos()),
+            
+            // Seção scrollável que contém campos específicos + tabs + busca + produtos
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  children: [
+                    _buildCamposEspecificos(),
+                    _buildTabs(),
+                    _buildBuscaProduto(),
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.7, // 70% da tela para produtos (aumentado)
+                      child: _buildGridProdutos(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -750,21 +995,21 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
 
   Widget _buildSeletorTipoPedido() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Tipo de Pedido:',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            'Tipo:',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
           Row(
             children: [
               _buildBotaoTipoPedido('delivery', '🚚', 'Delivery'),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               _buildBotaoTipoPedido('balcao', '🏪', 'Balcão'),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               _buildBotaoTipoPedido('mesa', '🪑', 'Mesa'),
             ],
           ),
@@ -786,21 +1031,22 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
           decoration: BoxDecoration(
             color: isSelected ? Colors.red : Colors.white,
             border: Border.all(
               color: isSelected ? Colors.red : Colors.grey.shade300,
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
-          child: Column(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
                 emoji,
-                style: const TextStyle(fontSize: 24),
+                style: const TextStyle(fontSize: 18),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(width: 4),
               Text(
                 label,
                 style: TextStyle(
@@ -819,7 +1065,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   Widget _buildCamposEspecificos() {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -830,7 +1076,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               hint: 'Nome completo...',
               obrigatorio: true,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
             _buildCampoTexto(
               controller: _telefoneClienteController,
               label: '📱 Telefone',
@@ -838,33 +1084,33 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               obrigatorio: true,
               tipo: TextInputType.phone,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
             _buildCampoTexto(
               controller: _enderecoController,
               label: '📍 Endereço de Entrega',
               hint: 'Rua, número, bairro...',
               obrigatorio: true,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
             _buildCampoTexto(
               controller: _observacoesController,
               label: '📝 Observações de Entrega',
               hint: 'Complemento, referência...',
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: Colors.blue.shade200),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.access_time, color: Colors.blue, size: 16),
-                  const SizedBox(width: 8),
+                  const Icon(Icons.access_time, color: Colors.blue, size: 14),
+                  const SizedBox(width: 6),
                   Text(
-                    'Tempo estimado: $_tempoEstimado',
+                    'Est: $_tempoEstimado',
                     style: const TextStyle(
                       color: Colors.blue,
                       fontSize: 12,
@@ -881,20 +1127,20 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               hint: 'Nome do cliente...',
               obrigatorio: true,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: Colors.green.shade200),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.access_time, color: Colors.green, size: 16),
-                  const SizedBox(width: 8),
+                  const Icon(Icons.access_time, color: Colors.green, size: 14),
+                  const SizedBox(width: 6),
                   Text(
-                    'Tempo estimado: $_tempoEstimado',
+                    'Est: $_tempoEstimado',
                     style: const TextStyle(
                       color: Colors.green,
                       fontSize: 12,
@@ -915,7 +1161,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                       const Text(
                         '🪑 Mesa',
                         style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w500),
+                            fontSize: 22, fontWeight: FontWeight.w500),
                       ),
                       const SizedBox(height: 4),
                       DropdownButtonFormField<int>(
@@ -950,9 +1196,9 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.orange.shade50,
                 borderRadius: BorderRadius.circular(8),
@@ -966,7 +1212,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                     'Tempo estimado: $_tempoEstimado',
                     style: const TextStyle(
                       color: Colors.orange,
-                      fontSize: 12,
+                      fontSize: 22,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -974,7 +1220,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
         ],
       ),
     );
@@ -987,44 +1233,198 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     bool obrigatorio = false,
     TextInputType? tipo,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$label${obrigatorio ? ' *' : ''}',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: obrigatorio ? Colors.red.shade700 : Colors.black,
-          ),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          width: 280, // Largura fixa menor
-          child: TextField(
-            controller: controller,
-            keyboardType: tipo,
-            decoration: InputDecoration(
-              hintText: hint,
-              border: const OutlineInputBorder(),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.red.shade400),
-              ),
-              isDense: true, // Fazer o campo mais compacto
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Label com ícone
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 4),
+            child: Row(
+              children: [
+                _getIconForField(label),
+                const SizedBox(width: 4),
+                Text(
+                  _getCleanLabel(label),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: obrigatorio 
+                        ? Colors.red.shade700 
+                        : Colors.grey.shade700,
+                  ),
+                ),
+                if (obrigatorio) ...[
+                  const SizedBox(width: 2),
+                  Text(
+                    '*',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red.shade700,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        ),
-      ],
+          
+          // Campo de texto moderno
+          Container(
+            width: 260,
+            height: 36,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TextField(
+              controller: controller,
+              keyboardType: tipo,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: TextStyle(
+                  fontSize: 22,
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.normal,
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).primaryColor,
+                    width: 2,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.red.shade400, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                isDense: true,
+                // Ícone de sufixo para campos específicos
+                suffixIcon: _getSuffixIcon(label, controller),
+              ),
+              // Formatadores específicos por tipo
+              inputFormatters: _getInputFormatters(tipo, label),
+              // Validação em tempo real
+              onChanged: (value) => _validateField(label, value, obrigatorio),
+            ),
+          ),
+        ],
+      ),
     );
+  }
+  
+  /// Obtém ícone baseado no tipo de campo
+  Widget _getIconForField(String label) {
+    if (label.contains('Nome')) return Icon(Icons.person, size: 14, color: Colors.blue.shade600);
+    if (label.contains('Telefone')) return Icon(Icons.phone, size: 14, color: Colors.green.shade600);
+    if (label.contains('Endereço')) return Icon(Icons.location_on, size: 14, color: Colors.red.shade600);
+    if (label.contains('Observações')) return Icon(Icons.note, size: 14, color: Colors.orange.shade600);
+    if (label.contains('Garçom')) return Icon(Icons.restaurant_menu, size: 14, color: Colors.purple.shade600);
+    if (label.contains('Mesa')) return Icon(Icons.table_restaurant, size: 14, color: Colors.brown.shade600);
+    return Icon(Icons.edit, size: 14, color: Colors.grey.shade600);
+  }
+  
+  /// Remove emoji do label
+  String _getCleanLabel(String label) {
+    return label.replaceAll(RegExp(r'[🍕👤📱📍📝🪑🍽️]'), '').trim();
+  }
+  
+  /// Obtém ícone de sufixo para campos específicos
+  Widget? _getSuffixIcon(String label, TextEditingController controller) {
+    if (label.contains('Telefone')) {
+      return IconButton(
+        icon: Icon(Icons.contact_phone, size: 16, color: Colors.grey.shade600),
+        onPressed: () {
+          // Funcionalidade futura: abrir contatos
+          HapticFeedback.lightImpact();
+        },
+      );
+    }
+    
+    if (label.contains('Endereço')) {
+      return IconButton(
+        icon: Icon(Icons.my_location, size: 16, color: Colors.grey.shade600),
+        onPressed: () {
+          // Funcionalidade futura: GPS
+          HapticFeedback.lightImpact();
+        },
+      );
+    }
+    
+    if (controller.text.isNotEmpty) {
+      return IconButton(
+        icon: Icon(Icons.clear, size: 16, color: Colors.grey.shade600),
+        onPressed: () {
+          controller.clear();
+          HapticFeedback.lightImpact();
+        },
+      );
+    }
+    
+    return null;
+  }
+  
+  /// Obtém formatadores de input baseado no tipo
+  List<TextInputFormatter> _getInputFormatters(TextInputType? tipo, String label) {
+    List<TextInputFormatter> formatters = [];
+    
+    if (tipo == TextInputType.phone || label.contains('Telefone')) {
+      formatters.add(FilteringTextInputFormatter.digitsOnly);
+      formatters.add(_PhoneFormatter());
+    }
+    
+    if (label.contains('Nome')) {
+      formatters.add(FilteringTextInputFormatter.allow(RegExp(r'[a-zA-ZÀ-ÿ\s]')));
+      formatters.add(_NameFormatter());
+    }
+    
+    return formatters;
+  }
+  
+  /// Valida campo em tempo real
+  void _validateField(String label, String value, bool obrigatorio) {
+    if (!obrigatorio && value.isEmpty) return;
+    
+    // Validação de telefone
+    if (label.contains('Telefone') && value.isNotEmpty) {
+      final digits = value.replaceAll(RegExp(r'[^\d]'), '');
+      if (digits.length < 10 || digits.length > 11) {
+        // Campo inválido - pode adicionar feedback visual
+      }
+    }
+    
+    // Outras validações podem ser adicionadas aqui
   }
 
   Widget _buildTabs() {
     return TabBar(
       controller: _tabController,
       onTap: (_) => setState(() {
-        _limparSelecao();
         _filtroTexto = '';
         _buscaProdutoController.clear();
       }),
@@ -1038,7 +1438,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text('🚚 DELIVERY'),
-              Text('R\$ 40,00', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+              Text('R\$ 40,00', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             ],
           ),
         ),
@@ -1108,7 +1508,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                 Text(
                   '${_produtosAtuais.length} items ${_produtosBanco.isNotEmpty ? '(DB)' : '(Mock)'}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 22,
                     color: _produtosBanco.isNotEmpty
                         ? Colors.green
                         : Colors.orange,
@@ -1134,7 +1534,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             Text(
               'Carregando produtos...',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 22,
                 color: Colors.grey,
                 fontWeight: FontWeight.w500,
               ),
@@ -1160,7 +1560,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             Text(
               'Nenhum produto encontrado',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 22,
                 color: Colors.grey.shade600,
                 fontWeight: FontWeight.w500,
               ),
@@ -1171,7 +1571,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                   ? 'Erro ao carregar do banco de dados'
                   : 'Tente buscar por outro termo',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 22,
                 color: Colors.grey.shade500,
               ),
             ),
@@ -1187,20 +1587,49 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       );
     }
 
+    // Agrupar produtos por nome para criar estrutura de tabela
+    final Map<String, Map<String, dynamic>> produtosAgrupados = {};
+    
+    for (final produto in produtos) {
+      final nome = produto['nome'] as String;
+      if (!produtosAgrupados.containsKey(nome)) {
+        produtosAgrupados[nome] = {
+          'nome': nome,
+          'ingredientes': produto['descricao'] ?? produto['ingredientes'] ?? '',
+          'categoriaNome': produto['categoriaNome'] ?? '',
+          'precos': <String, double>{},
+          'produto_original': produto,
+        };
+      }
+      
+      // Se produto tem preços por tamanho
+      final precosMap = produto['precosMap'] as Map<String, double>? ?? {};
+      if (precosMap.isNotEmpty) {
+        produtosAgrupados[nome]!['precos'] = precosMap;
+      } else {
+        // Usar preço base
+        final preco = (produto['preco'] as num?)?.toDouble() ?? 0.0;
+        produtosAgrupados[nome]!['precos'] = {'M': preco};
+      }
+    }
+    
+    final produtosOrdenados = produtosAgrupados.values.toList()
+      ..sort((a, b) => a['nome'].toString().compareTo(b['nome'].toString()));
+
     return Column(
       children: [
         // Banner informativo para pizzas delivery
         if (_tabController.index == 0 && produtos.isNotEmpty) ...[
           Container(
-            margin: const EdgeInsets.all(8),
-            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF4CAF50), Color(0xFF66BB6A)],
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
                   color: Colors.green.withValues(alpha: 0.3),
@@ -1228,7 +1657,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                         'PROMOÇÃO DELIVERY',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 14,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.2,
                         ),
@@ -1237,7 +1666,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                         'Todas as pizzas grandes por apenas R\$ 40,00',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
+                          fontSize: 22,
                         ),
                       ),
                     ],
@@ -1253,7 +1682,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                     'R\$ 40,00',
                     style: TextStyle(
                       color: Color(0xFF4CAF50),
-                      fontSize: 14,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1263,562 +1692,644 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           ),
         ],
         
-        // Grid de produtos
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(6),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 6, // Aumentado para 6 (cards ainda menores)
-              crossAxisSpacing: 4,
-              mainAxisSpacing: 4,
-              childAspectRatio: 0.8, // Proporção ajustada para cards mais compactos
-            ),
-            itemCount: produtos.length,
-      itemBuilder: (context, index) {
-        final produto = produtos[index];
-        final isSelected = _produtoSelecionado == produto['nome'];
-
-        return GestureDetector(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            setState(() {
-              _produtoSelecionado = produto['nome'];
-              if (_isPizza) {
-                _sabor1 = produto['nome'];
-
-                // Se for Pizza Delivery, forçar tamanho Grande
-                final categoriaNome = produto['categoriaNome'] ?? '';
-                final isPizzaDelivery =
-                    categoriaNome.toLowerCase().contains('delivery');
-                if (isPizzaDelivery) {
-                  _tamanhoSelecionado = 'G';
-                }
-              }
-            });
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? Colors.red.withValues(alpha: 0.1)
-                  : Theme.of(context).cardColor,
-              border: Border.all(
-                color: isSelected 
-                  ? Colors.red 
-                  : Theme.of(context).dividerColor.withValues(alpha: 0.3),
-                width: isSelected ? 2.0 : 1,
-              ),
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                if (isSelected) ...[
-                  BoxShadow(
-                    color: Colors.red.withValues(alpha: 0.15),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ] else ...[
-                  BoxShadow(
-                    color: Theme.of(context).shadowColor.withValues(alpha: 0.08),
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(2.0), // Reduzido para 2px
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    produto['imagem'],
-                    style: const TextStyle(fontSize: 16), // Reduzido para 16
-                  ),
-                  const SizedBox(height: 2), // Reduzido para 2
-                  Flexible(
-                    child: Text(
-                      produto['nome'],
-                      style: TextStyle(
-                        fontSize: 9, // Aumentado para 9
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white
-                            : Colors.black87,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // Tag DELIVERY para pizzas delivery (mais visível)
-                  if (produto['categoriaNome']
-                          ?.toLowerCase()
-                          ?.contains('delivery') ==
-                      true) ...[
-                    const SizedBox(height: 2),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green.withValues(alpha: 0.3),
-                            blurRadius: 2,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: const Text(
-                        '🚚',
-                        style: TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 2),
-                  Text(
-                    'R\$ ${produto['preco'].toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 8, // Reduzido para 8
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+        // Cabeçalho da tabela tipo cardápio
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: Theme.of(context).primaryColor,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(12),
+              topRight: Radius.circular(12),
             ),
           ),
-        );
-      },
-            ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildColunaConfiguracao() {
-    return Expanded(
-      flex: 30, // Mantido em 30%
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(
-          border: Border(right: BorderSide(color: Colors.grey, width: 0.5)),
-        ),
-        child: _produtoSelecionado == null
-            ? const Center(
-                child: Text(
-                  'Selecione um produto',
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _produtoSelecionado!,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  if (_isPizza) ...[
-                    _buildSeletorTamanho(),
-                    const SizedBox(height: 24),
-                    _buildToggleDoisSabores(),
-                    if (_doisSabores) ...[
-                      const SizedBox(height: 16),
-                      _buildSeletorSabores(),
-                    ],
-                    const SizedBox(height: 24),
-                  ],
-                  _buildSeletorQuantidade(),
-                  const Spacer(),
-                  _buildBotaoAdicionar(),
-                ],
-              ),
-      ),
-    );
-  }
-
-  Widget _buildSeletorTamanho() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Tamanho',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: _getTamanhosDisponiveis().map((tamanho) {
-            final isSelected = _tamanhoSelecionado == tamanho;
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _tamanhoSelecionado = tamanho);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected ? Colors.red : Colors.white,
-                      border: Border.all(
-                        color: isSelected ? Colors.red : Colors.grey.shade300,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      tamanho,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildToggleDoisSabores() {
-    return Row(
-      children: [
-        Switch(
-          value: _doisSabores,
-          onChanged: (value) {
-            HapticFeedback.selectionClick();
-            setState(() {
-              _doisSabores = value;
-              if (!value) {
-                _sabor2 = null;
-              }
-            });
-          },
-          activeColor: Colors.red,
-        ),
-        const SizedBox(width: 8),
-        const Text(
-          'Pizza 2 Sabores',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSeletorSabores() {
-    // Pegar apenas as pizzas disponíveis
-    final pizzasDisponiveis = _produtosBanco.isNotEmpty
-        ? _produtosBanco.where((p) {
-            final categoria = p['categoriaNome'].toString().toLowerCase();
-            final tipoProduto = p['tipoProduto'].toString().toLowerCase();
-            final nomeProduto = p['nome'].toString().toLowerCase();
-
-            final palavrasChavePizza = [
-              'pizza',
-              'pizzas especiais',
-              'pizzas salgadas',
-              'pizzas doces'
-            ];
-
-            return palavrasChavePizza.any((palavra) =>
-                categoria.contains(palavra.toLowerCase()) ||
-                tipoProduto.contains(palavra.toLowerCase()) ||
-                nomeProduto.contains('pizza'));
-          }).toList()
-        : _pizzas;
-
-    return Column(
-      children: [
-        _buildDropdownSabor('Metade 1', _sabor1, pizzasDisponiveis, (valor) {
-          setState(() {
-            _sabor1 = valor;
-            // Recalcular preço automaticamente quando trocar sabor 1
-            _atualizarPrecoAutomatico();
-          });
-        }),
-        const SizedBox(height: 12),
-        _buildDropdownSabor('Metade 2', _sabor2, pizzasDisponiveis, (valor) {
-          setState(() {
-            _sabor2 = valor;
-            // Recalcular preço automaticamente quando trocar sabor 2
-            _atualizarPrecoAutomatico();
-          });
-        }),
-      ],
-    );
-  }
-
-  Widget _buildDropdownSabor(
-      String label,
-      String? valor,
-      List<Map<String, dynamic>> pizzasDisponiveis,
-      Function(String?) onChanged) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 4),
-        _buildSearchableDropdown(
-          value: valor,
-          items: pizzasDisponiveis,
-          onChanged: onChanged,
-          hint: 'Buscar e selecionar pizza...',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSearchableDropdown({
-    required String? value,
-    required List<Map<String, dynamic>> items,
-    required Function(String?) onChanged,
-    required String hint,
-  }) {
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: InkWell(
-        onTap: () => _showSearchablePizzaDialog(items, onChanged, value),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             children: [
-              Expanded(
+              SizedBox(
+                width: 120,
                 child: Text(
-                  value ?? hint,
+                  'Pizza',
                   style: TextStyle(
-                    fontSize: 12,
-                    color: value != null ? Colors.black : Colors.grey.shade600,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Icon(Icons.search, size: 16, color: Colors.grey.shade600),
+              const Expanded(
+                child: Text(
+                  'Ingredientes',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                  ),
+                ),
+              ),
+              ...['P', 'M', 'G', 'F'].map((tamanho) => SizedBox(
+                width: 70,
+                child: Text(
+                  tamanho == 'P' ? 'Pequena' : 
+                  tamanho == 'M' ? 'Média' :
+                  tamanho == 'G' ? 'Grande' : 'Família',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              )),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _showSearchablePizzaDialog(List<Map<String, dynamic>> pizzas,
-      Function(String?) onChanged, String? currentValue) {
-    String filtro = '';
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final pizzasFiltradas = filtro.isEmpty
-                ? pizzas
-                : pizzas
-                    .where((p) => p['nome']
-                        .toString()
-                        .toLowerCase()
-                        .contains(filtro.toLowerCase()))
-                    .toList();
-
-            return AlertDialog(
-              title: const Text('Selecionar Pizza',
-                  style: TextStyle(fontSize: 16)),
-              contentPadding: const EdgeInsets.all(16),
-              content: SizedBox(
-                width: 300,
-                height: 400,
-                child: Column(
-                  children: [
-                    // Campo de busca
-                    TextField(
-                      decoration: const InputDecoration(
-                        hintText: '🔍 Buscar pizza...',
-                        border: OutlineInputBorder(),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        isDense: true,
+        
+        // Tabela de produtos
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).cardColor,
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+              border: Border.all(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+              ),
+            ),
+            child: ListView.builder(
+              padding: EdgeInsets.zero,
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: produtosOrdenados.length,
+              itemBuilder: (context, index) {
+                final produto = produtosOrdenados[index];
+                final precos = produto['precos'] as Map<String, double>;
+                final isDelivery = produto['categoriaNome'].toString().toLowerCase().contains('delivery');
+                
+                return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                          width: 0.5,
+                        ),
                       ),
-                      onChanged: (value) {
-                        setDialogState(() {
-                          filtro = value;
-                        });
-                      },
                     ),
-                    const SizedBox(height: 12),
-
-                    // Lista de pizzas
-                    Expanded(
-                      child: pizzasFiltradas.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'Nenhuma pizza encontrada',
-                                style: TextStyle(color: Colors.grey),
+                    child: Row(
+                      children: [
+                        // Nome da pizza
+                        SizedBox(
+                          width: 120,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                produto['nome'],
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
                               ),
-                            )
-                          : ListView.builder(
-                              itemCount: pizzasFiltradas.length,
-                              itemBuilder: (context, index) {
-                                final pizza = pizzasFiltradas[index];
-                                final isSelected =
-                                    currentValue == pizza['nome'];
-
-                                return ListTile(
-                                  dense: true,
-                                  leading: Text(
-                                    pizza['imagem'] ?? '🍕',
-                                    style: const TextStyle(fontSize: 20),
+                              if (isDelivery) ...[
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  title: Text(
-                                    pizza['nome'],
+                                  child: const Text(
+                                    '🚚 DELIVERY',
                                     style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                      color: isSelected
-                                          ? Colors.red
-                                          : Colors.black,
+                                      color: Colors.white,
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  subtitle: Text(
-                                    'R\$ ${pizza['preco'].toStringAsFixed(2)}',
-                                    style: const TextStyle(fontSize: 12),
-                                  ),
-                                  trailing: isSelected
-                                      ? const Icon(Icons.check_circle,
-                                          color: Colors.red, size: 20)
-                                      : null,
-                                  onTap: () {
-                                    onChanged(pizza['nome']);
-                                    Navigator.pop(context);
-                                  },
-                                );
-                              },
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        
+                        // Ingredientes
+                        Expanded(
+                          child: Text(
+                            produto['ingredientes'],
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        
+                        // Preços por tamanho (clicáveis com sistema intuitivo)
+                        ...['P', 'M', 'G', 'F'].map((tamanho) {
+                          final preco = isDelivery && tamanho == 'G' ? 40.0 : precos[tamanho];
+                          final estadoSelecao = _getEstadoSelecao(produto['nome'], tamanho);
+                          final temSelecao = _selecoesAtuais.containsKey(tamanho);
+                          
+                          return SizedBox(
+                            width: 70,
+                            child: preco != null
+                                ? Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      InkWell(
+                                        onTap: () => _processarClique(
+                                          produto['nome'],
+                                          produto['ingredientes'],
+                                          tamanho,
+                                          preco,
+                                          isDelivery,
+                                        ),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                                          decoration: BoxDecoration(
+                                            color: _getCorSelecao(estadoSelecao, isDelivery && tamanho == 'G'),
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(
+                                              color: _getCorBordaSelecao(estadoSelecao, isDelivery && tamanho == 'G'),
+                                              width: estadoSelecao != 'none' ? 2 : 1,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                'R\$ ${preco.toStringAsFixed(2)}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: _getCorTextoSelecao(estadoSelecao, isDelivery && tamanho == 'G'),
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              if (estadoSelecao != 'none') ...[
+                                                const SizedBox(height: 2),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                                  decoration: BoxDecoration(
+                                                    color: estadoSelecao == 'single' ? Colors.green : Colors.orange,
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Text(
+                                                    estadoSelecao == 'single' ? '1x' : 'Mix',
+                                                    style: const TextStyle(
+                                                      fontSize: 8,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      // Botão de confirmação flutuante
+                                      if (temSelecao && _tamanhoSelecionandoAtual == tamanho)
+                                        Positioned(
+                                          top: -5,
+                                          right: -5,
+                                          child: InkWell(
+                                            onTap: () => _mostrarModalConfirmacao(tamanho),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.green,
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black.withValues(alpha: 0.3),
+                                                    blurRadius: 4,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: const Icon(
+                                                Icons.check,
+                                                color: Colors.white,
+                                                size: 12,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  )
+                                : Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    child: Text(
+                                      '-',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                          );
+                        }),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancelar'),
-                ),
-                if (currentValue != null)
-                  TextButton(
-                    onPressed: () {
-                      onChanged(null);
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Limpar'),
-                  ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSeletorQuantidade() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Quantidade',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            IconButton(
-              onPressed: _quantidade > 1
-                  ? () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _quantidade--);
-                    }
-                  : null,
-              icon: const Icon(Icons.remove),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                _quantidade.toString(),
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
-            ),
-            IconButton(
-              onPressed: () {
-                HapticFeedback.selectionClick();
-                setState(() => _quantidade++);
+                );
               },
-              icon: const Icon(Icons.add),
             ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Preço: R\$ ${_calcularPreco().toStringAsFixed(2)}',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.red,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildBotaoAdicionar() {
-    final canAdd =
-        _produtoSelecionado != null && (!_doisSabores || _sabor2 != null);
-
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: canAdd ? _adicionarAoCarrinho : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          foregroundColor: Theme.of(context).colorScheme.onPrimary,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+  /// Modal para seleção de opções do produto
+  void _mostrarModalSelecao(
+    String nomePizza,
+    String ingredientes,
+    String tamanho,
+    double preco,
+    bool isDelivery,
+  ) {
+    // Determinar quantos sabores são permitidos baseado no tamanho
+    final maxSabores = tamanho == 'F' ? 3 : 2;
+    
+    List<String> saboresSelecionados = [nomePizza];
+    int quantidade = 1;
+    bool multiSabores = false;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // Calcular preço baseado no maior sabor selecionado
+            double calcularPreco() {
+              if (isDelivery && tamanho == 'G') {
+                return 40.0 * quantidade;
+              }
+              
+              if (!multiSabores || saboresSelecionados.length <= 1) {
+                return preco * quantidade;
+              }
+              
+              // Para múltiplos sabores, usar o maior preço
+              double maiorPreco = preco;
+              final produtos = _produtosAtuais;
+              
+              for (final saborNome in saboresSelecionados) {
+                final produto = produtos.firstWhere(
+                  (p) => p['nome'] == saborNome,
+                  orElse: () => {'precosMap': <String, double>{}},
+                );
+                final precosMap = produto['precosMap'] as Map<String, double>? ?? {};
+                final precoSabor = precosMap[tamanho] ?? preco;
+                if (precoSabor > maiorPreco) {
+                  maiorPreco = precoSabor;
+                }
+              }
+              
+              return maiorPreco * quantidade;
+            }
+            
+            return Container(
+              margin: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardColor,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Cabeçalho
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                nomePizza,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Tamanho: ${_getNomeTamanho(tamanho)}',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Ingredientes
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        ingredientes,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Toggle múltiplos sabores
+                    Row(
+                      children: [
+                        Switch(
+                          value: multiSabores,
+                          onChanged: (value) {
+                            setModalState(() {
+                              multiSabores = value;
+                              if (!value) {
+                                saboresSelecionados = [nomePizza];
+                              }
+                            });
+                          },
+                          activeColor: Theme.of(context).primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Múltiplos sabores (até $maxSabores)',
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                    
+                    // Seletor de sabores
+                    if (multiSabores) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Sabores selecionados (${saboresSelecionados.length}/$maxSabores):',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      ...saboresSelecionados.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final sabor = entry.value;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () => _mostrarSeletorSabor(context, setModalState, index, saboresSelecionados, tamanho),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(sabor),
+                                  ),
+                                ),
+                              ),
+                              if (index > 0)
+                                IconButton(
+                                  onPressed: () {
+                                    setModalState(() {
+                                      saboresSelecionados.removeAt(index);
+                                    });
+                                  },
+                                  icon: const Icon(Icons.remove_circle, color: Colors.red),
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
+                      if (saboresSelecionados.length < maxSabores)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            setModalState(() {
+                              saboresSelecionados.add('');
+                            });
+                            _mostrarSeletorSabor(context, setModalState, saboresSelecionados.length - 1, saboresSelecionados, tamanho);
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Adicionar sabor'),
+                        ),
+                      const SizedBox(height: 16),
+                    ],
+                    
+                    // Seletor de quantidade
+                    Row(
+                      children: [
+                        const Text('Quantidade:', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w500)),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: quantidade > 1 ? () {
+                            setModalState(() => quantidade--);
+                          } : null,
+                          icon: const Icon(Icons.remove),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(quantidade.toString(), style: const TextStyle(fontSize: 18)),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            setModalState(() => quantidade++);
+                          },
+                          icon: const Icon(Icons.add),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 20),
+                    
+                    // Preço e botão adicionar
+                    Row(
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Total:', style: TextStyle(fontSize: 18)),
+                            Text(
+                              'R\$ ${calcularPreco().toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            _adicionarAoCarrinhoDirecto(
+                              nomePizza,
+                              saboresSelecionados,
+                              tamanho,
+                              quantidade,
+                              calcularPreco(),
+                            );
+                            Navigator.pop(context);
+                          },
+                          icon: const Icon(Icons.add_shopping_cart),
+                          label: const Text('Adicionar'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+  
+  String _getNomeTamanho(String tamanho) {
+    switch (tamanho) {
+      case 'P': return 'Pequena';
+      case 'M': return 'Média';
+      case 'G': return 'Grande';
+      case 'F': return 'Família';
+      default: return tamanho;
+    }
+  }
+  
+  /// Mostrar seletor de sabor específico
+  void _mostrarSeletorSabor(
+    BuildContext context,
+    StateSetter setModalState,
+    int index,
+    List<String> saboresSelecionados,
+    String tamanho,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final produtos = _produtosAtuais.where((p) => 
+          p['categoriaNome'].toString().toLowerCase().contains('pizza')).toList();
+        
+        return AlertDialog(
+          title: Text('Selecionar Sabor ${index + 1}'),
+          content: SizedBox(
+            width: 400,
+            height: 300,
+            child: ListView.builder(
+              itemCount: produtos.length,
+              itemBuilder: (context, i) {
+                final produto = produtos[i];
+                final precosMap = produto['precosMap'] as Map<String, double>? ?? {};
+                final preco = precosMap[tamanho] ?? 0.0;
+                
+                return ListTile(
+                  title: Text(produto['nome']),
+                  subtitle: Text('R\$ ${preco.toStringAsFixed(2)}'),
+                  onTap: () {
+                    setModalState(() {
+                      saboresSelecionados[index] = produto['nome'];
+                    });
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
           ),
-        ),
-        child: const Text(
-          '+ Adicionar ao Carrinho',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  /// Adicionar produto diretamente ao carrinho
+  void _adicionarAoCarrinhoDirecto(
+    String nomePizza,
+    List<String> sabores,
+    String tamanho,
+    int quantidade,
+    double precoTotal,
+  ) {
+    HapticFeedback.lightImpact();
+    
+    String descricao = '';
+    if (sabores.length > 1) {
+      descricao = '${sabores.where((s) => s.isNotEmpty).join(' + ')} $tamanho';
+    } else {
+      descricao = '$nomePizza $tamanho';
+    }
+    
+    final item = {
+      'nome': nomePizza,
+      'descricao': descricao,
+      'preco': precoTotal / quantidade,
+      'quantidade': quantidade,
+      'total': precoTotal,
+      'observacao': '',
+    };
+    
+    setState(() {
+      _carrinho.add(item);
+      _calcularSubtotal();
+    });
+    
+    // Mostrar confirmação
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$descricao adicionado ao carrinho!'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
+
+
   Widget _buildColunaCarrinho() {
     return Expanded(
-      flex: 25, // Diminuído de 30% para 25%
+      flex: 30, // Aumentado para 30% sem a coluna central
       child: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
@@ -1837,7 +2348,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               child: Text(
                 'Carrinho',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1849,7 +2360,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                         '(vazio)',
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                          fontSize: 16,
+                          fontSize: 22,
                         ),
                       ),
                     )
@@ -1892,7 +2403,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                     Text(
                       item['descricao'],
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 22,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1900,7 +2411,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                     Text(
                       'R\$ ${item['preco'].toStringAsFixed(2)} cada',
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 22,
                         color: Colors.grey,
                       ),
                     ),
@@ -1959,7 +2470,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
               Text(
                 'R\$ ${item['total'].toStringAsFixed(2)}',
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.red,
                 ),
@@ -2010,7 +2521,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                         const TextInputType.numberWithOptions(decimal: true),
                     textAlign: TextAlign.right,
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 22,
                       fontWeight: FontWeight.bold,
                     ),
                     decoration: InputDecoration(
@@ -2045,12 +2556,12 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
             children: [
               const Text(
                 'TOTAL:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
               Text(
                 'R\$ ${total.toStringAsFixed(2)}',
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Colors.red,
                 ),
@@ -2119,12 +2630,12 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                       children: [
                         const Text(
                           'Troco',
-                          style: TextStyle(fontSize: 12, color: Colors.green),
+                          style: TextStyle(fontSize: 22, color: Colors.green),
                         ),
                         Text(
                           'R\$ ${_troco.toStringAsFixed(2)}',
                           style: const TextStyle(
-                            fontSize: 16,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: Colors.green,
                           ),
@@ -2514,5 +3025,78 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       default:
         return 'Pedido finalizado com sucesso!';
     }
+  }
+}
+
+/// Formatador para campos de telefone
+class _PhoneFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+    
+    if (digits.length <= 10) {
+      // Formato: (XX) XXXX-XXXX
+      String formatted = '';
+      if (digits.length >= 2) {
+        formatted += '(${digits.substring(0, 2)}) ';
+        if (digits.length >= 6) {
+          formatted += '${digits.substring(2, 6)}-';
+          if (digits.length > 6) {
+            formatted += digits.substring(6, digits.length > 10 ? 10 : digits.length);
+          }
+        } else if (digits.length > 2) {
+          formatted += digits.substring(2);
+        }
+      } else if (digits.isNotEmpty) {
+        formatted = digits;
+      }
+      
+      return TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    } else {
+      // Formato: (XX) XXXXX-XXXX
+      String formatted = '';
+      if (digits.length >= 2) {
+        formatted += '(${digits.substring(0, 2)}) ';
+        if (digits.length >= 7) {
+          formatted += '${digits.substring(2, 7)}-';
+          if (digits.length > 7) {
+            formatted += digits.substring(7, digits.length > 11 ? 11 : digits.length);
+          }
+        } else if (digits.length > 2) {
+          formatted += digits.substring(2);
+        }
+      }
+      
+      return TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    }
+  }
+}
+
+/// Formatador para campos de nome (capitaliza primeira letra de cada palavra)
+class _NameFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final words = newValue.text.split(' ');
+    final capitalizedWords = words.map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+    
+    return TextEditingValue(
+      text: capitalizedWords,
+      selection: newValue.selection,
+    );
   }
 }

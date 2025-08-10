@@ -1050,7 +1050,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Pizzaria Sistema',
+                  'Pit-Stop',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 20,
@@ -1106,6 +1106,14 @@ class _DashboardScreenState extends State<DashboardScreen>
             onTap: () {
               Navigator.pop(context);
               Navigator.pushNamed(context, '/historico-caixas');
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.edit),
+            title: const Text('Editar Preços'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, '/editar-precos');
             },
           ),
           ListTile(

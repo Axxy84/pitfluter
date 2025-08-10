@@ -9,22 +9,14 @@ class NovoPedidoModal extends StatefulWidget {
 
 class _NovoPedidoModalState extends State<NovoPedidoModal> {
   final _formKey = GlobalKey<FormState>();
-  final _clienteController = TextEditingController();
   final _observacoesController = TextEditingController();
   
-  String? _clienteSelecionado;
   String? _produtoSelecionado;
   String? _tamanhoSelecionado;
   int _quantidade = 1;
   double _valorTotal = 0.0;
 
   // Dados mockados
-  final List<String> _clientes = [
-    'João Silva',
-    'Maria Santos',
-    'Pedro Costa',
-    'Ana Oliveira',
-  ];
 
   final List<Map<String, dynamic>> _produtos = [
     {'nome': 'Pizza Margherita', 'preco': 28.90},
@@ -41,7 +33,6 @@ class _NovoPedidoModalState extends State<NovoPedidoModal> {
 
   @override
   void dispose() {
-    _clienteController.dispose();
     _observacoesController.dispose();
     super.dispose();
   }
@@ -70,15 +61,6 @@ class _NovoPedidoModalState extends State<NovoPedidoModal> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Seção Cliente
-              _buildSection(
-                'Cliente',
-                Icons.person,
-                _buildClienteSection(),
-              ),
-              
-              const SizedBox(height: 24),
-              
               // Seção Produto
               _buildSection(
                 'Produto',
@@ -139,49 +121,6 @@ class _NovoPedidoModalState extends State<NovoPedidoModal> {
     );
   }
 
-  Widget _buildClienteSection() {
-    return Column(
-      children: [
-        DropdownButtonFormField<String>(
-          value: _clienteSelecionado,
-          decoration: const InputDecoration(
-            labelText: 'Selecionar Cliente',
-            border: OutlineInputBorder(),
-          ),
-          items: _clientes.map((cliente) {
-            return DropdownMenuItem(
-              value: cliente,
-              child: Text(cliente),
-            );
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _clienteSelecionado = value;
-            });
-          },
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Por favor, selecione um cliente';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Ou digite o nome de um novo cliente:',
-          style: TextStyle(color: Colors.grey),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: _clienteController,
-          decoration: const InputDecoration(
-            labelText: 'Nome do Cliente',
-            border: OutlineInputBorder(),
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildProdutoSection() {
     return Column(

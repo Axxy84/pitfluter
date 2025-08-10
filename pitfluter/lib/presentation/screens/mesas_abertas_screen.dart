@@ -14,8 +14,9 @@ class MesasAbertasScreen extends StatefulWidget {
 class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
   final MesaService _mesaService = MesaService();
   final ImpressaoService _impressaoService = ImpressaoService();
-  final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
-  
+  final NumberFormat _currencyFormat =
+      NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+
   List<Map<String, dynamic>> _mesasAbertas = [];
   bool _isLoading = true;
 
@@ -27,9 +28,9 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
 
   Future<void> _carregarMesasAbertas() async {
     setState(() => _isLoading = true);
-    
+
     final mesas = await _mesaService.getMesasAbertas();
-    
+
     setState(() {
       _mesasAbertas = mesas;
       _isLoading = false;
@@ -38,7 +39,7 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
 
   Future<void> _mostrarDetalhesMesa(Map<String, dynamic> mesa) async {
     final detalhes = await _mesaService.getDetalhesMesa(mesa['mesa']['id']);
-    
+
     if (detalhes == null || !mounted) return;
 
     showDialog(
@@ -52,112 +53,116 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Mesa ${detalhes['mesa']['numero']}',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-              const Divider(),
-              const SizedBox(height: 16),
-              Text(
-                'Pedidos:',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              ...((detalhes['pedidos'] as List).map((pedido) => 
-                Card(
-                  child: ListTile(
-                    title: Text('Pedido #${pedido['numero']}'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (pedido['itens_pedido'] != null)
-                          ...((pedido['itens_pedido'] as List).map((item) =>
-                            Text('${item['quantidade']}x ${item['produtos']?['nome'] ?? 'Produto'}')
-                          )),
-                      ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Mesa ${detalhes['mesa']['numero']}',
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    trailing: Text(
-                      _currencyFormat.format(pedido['total'] ?? 0),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(context).pop(),
                     ),
-                  ),
+                  ],
                 ),
-              )),
-              const SizedBox(height: 16),
-              const Divider(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Total:',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  Text(
-                    _currencyFormat.format(detalhes['total']),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).primaryColor,
+                const Divider(),
+                const SizedBox(height: 16),
+                Text(
+                  'Pedidos:',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                ...((detalhes['pedidos'] as List).map(
+                  (pedido) => Card(
+                    child: ListTile(
+                      title: Text('Pedido #${pedido['numero']}'),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (pedido['itens_pedido'] != null)
+                            ...((pedido['itens_pedido'] as List).map((item) => Text(
+                                '${item['quantidade']}x ${item['produtos']?['nome'] ?? 'Produto'}'))),
+                        ],
+                      ),
+                      trailing: Text(
+                        _currencyFormat.format(pedido['total'] ?? 0),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  // Botões principais
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.add_shopping_cart, size: 20),
-                    label: const Text('Add Consumo'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                )),
+                const SizedBox(height: 16),
+                const Divider(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total:',
+                      style: Theme.of(context).textTheme.titleLarge,
                     ),
-                    onPressed: () => _adicionarConsumo(mesa['mesa']['id'], setDialogState),
-                  ),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.receipt, size: 20),
-                    label: const Text('Comanda'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    Text(
+                      _currencyFormat.format(detalhes['total']),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).primaryColor,
+                          ),
                     ),
-                    onPressed: () async {
-                      await _imprimirComanda(detalhes);
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.print, size: 20),
-                    label: const Text('Conta'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    // Botões principais
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.add_shopping_cart, size: 20),
+                      label: const Text('Add Consumo'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                      onPressed: () =>
+                          _adicionarConsumo(mesa['mesa']['id'], setDialogState),
                     ),
-                    onPressed: () async {
-                      await _impressaoService.imprimirContaMesa(detalhes);
-                    },
-                  ),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.payment, size: 20),
-                    label: const Text('Fechar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.receipt, size: 20),
+                      label: const Text('Comanda'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                      onPressed: () async {
+                        await _imprimirComanda(detalhes);
+                      },
                     ),
-                    onPressed: () => _fecharContaMesa(mesa['mesa']['id']),
-                  ),
-                ],
-              ),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.print, size: 20),
+                      label: const Text('Conta'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                      onPressed: () async {
+                        await _impressaoService.imprimirContaMesa(detalhes);
+                      },
+                    ),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.payment, size: 20),
+                      label: const Text('Fechar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                      ),
+                      onPressed: () => _fecharContaMesa(mesa['mesa']['id']),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -168,7 +173,7 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
 
   double _calcularPrecoTotal(Map<String, dynamic> produto, int quantidade) {
     double preco = 0.0;
-    
+
     if (produto['tipo_produto'] == 'pizza') {
       // Para pizza, usar o preço selecionado
       preco = (produto['preco_selecionado'] ?? 0.0).toDouble();
@@ -176,7 +181,7 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
       // Para outros produtos
       preco = (produto['preco_unitario'] ?? produto['preco'] ?? 0.0).toDouble();
     }
-    
+
     return preco * quantidade;
   }
 
@@ -189,9 +194,9 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
         'total': detalhes['total'],
         'tipo': 'comanda',
       };
-      
+
       await _impressaoService.imprimirContaMesa(comanda);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Comanda impressa com sucesso!')),
@@ -211,22 +216,22 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
 
   Future<void> _adicionarConsumo(int mesaId, StateSetter setDialogState) async {
     final supabase = Supabase.instance.client;
-    
+
     // Buscar produtos disponíveis com preços
     final produtosResponse = await supabase
-        .from('produtos_produto')
-        .select('*, produtos_produtopreco(*)')
+        .from('produtos')
+        .select('*, produtos_precos(*)')
         .eq('ativo', true)
         .order('nome');
-    
+
     if (!mounted) return;
-    
+
     Map<String, dynamic>? produtoSelecionado;
     int quantidade = 1;
     final observacoesController = TextEditingController();
     final searchController = TextEditingController();
     List<Map<String, dynamic>> produtosFiltrados = List.from(produtosResponse);
-    
+
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -248,7 +253,8 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
                   onChanged: (value) {
                     setState(() {
                       produtosFiltrados = produtosResponse.where((produto) {
-                        final nome = produto['nome']?.toString().toLowerCase() ?? '';
+                        final nome =
+                            produto['nome']?.toString().toLowerCase() ?? '';
                         final busca = value.toLowerCase();
                         return nome.contains(busca);
                       }).toList();
@@ -267,35 +273,45 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
                       itemCount: produtosFiltrados.length,
                       itemBuilder: (context, index) {
                         final produto = produtosFiltrados[index];
-                        
+
                         // Determinar o preço baseado no tipo de produto
                         double preco = 0.0;
                         String precoTexto = '';
-                        
-                        if (produto['tipo_produto'] == 'pizza' && produto['produtos_produtopreco'] != null) {
+
+                        if (produto['tipo_produto'] == 'pizza' &&
+                            produto['produtos_precos'] != null) {
                           // Para pizzas, mostrar faixa de preço ou menor preço
-                          final precos = produto['produtos_produtopreco'] as List;
+                          final precos = produto['produtos_precos'] as List;
                           if (precos.isNotEmpty) {
-                            final precosValores = precos.map((p) => (p['preco'] ?? 0.0) as num).toList();
+                            final precosValores = precos
+                                .map((p) => (p['preco'] ?? 0.0) as num)
+                                .toList();
                             precosValores.sort();
                             preco = precosValores.first.toDouble();
                             if (precosValores.length > 1) {
-                              precoTexto = 'A partir de ${_currencyFormat.format(preco)}';
+                              precoTexto =
+                                  'A partir de ${_currencyFormat.format(preco)}';
                             } else {
                               precoTexto = _currencyFormat.format(preco);
                             }
                           }
                         } else {
                           // Para outros produtos, usar preco_unitario
-                          preco = (produto['preco_unitario'] ?? produto['preco'] ?? 0.0).toDouble();
+                          preco = (produto['preco_unitario'] ??
+                                  produto['preco'] ??
+                                  0.0)
+                              .toDouble();
                           precoTexto = _currencyFormat.format(preco);
                         }
-                        
-                        final isSelected = produtoSelecionado?['id'] == produto['id'];
-                        
+
+                        final isSelected =
+                            produtoSelecionado?['id'] == produto['id'];
+
                         return ListTile(
                           selected: isSelected,
-                          selectedTileColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                          selectedTileColor: Theme.of(context)
+                              .primaryColor
+                              .withValues(alpha: 0.1),
                           title: Text(produto['nome'] ?? 'Sem nome'),
                           subtitle: Text(produto['descricao'] ?? ''),
                           trailing: Column(
@@ -331,22 +347,30 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
                 ),
                 const SizedBox(height: 16),
                 // Se for pizza, mostrar seleção de tamanho
-                if (produtoSelecionado != null && produtoSelecionado!['tipo_produto'] == 'pizza' && produtoSelecionado!['produtos_produtopreco'] != null)
+                if (produtoSelecionado != null &&
+                    produtoSelecionado!['tipo_produto'] == 'pizza' &&
+                    produtoSelecionado!['produtos_precos'] != null)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Tamanho:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text('Tamanho:',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      ...(produtoSelecionado!['produtos_produtopreco'] as List).map((precoItem) {
+                      ...(produtoSelecionado!['produtos_precos'] as List)
+                          .map((precoItem) {
                         return RadioListTile<String>(
                           title: Text(precoItem['tamanho'] ?? 'Tamanho'),
-                          subtitle: Text(_currencyFormat.format(precoItem['preco'] ?? 0)),
+                          subtitle: Text(
+                              _currencyFormat.format(precoItem['preco'] ?? 0)),
                           value: precoItem['tamanho'] ?? '',
-                          groupValue: produtoSelecionado!['tamanho_selecionado'],
+                          groupValue:
+                              produtoSelecionado!['tamanho_selecionado'],
                           onChanged: (value) {
                             setState(() {
-                              produtoSelecionado!['tamanho_selecionado'] = value;
-                              produtoSelecionado!['preco_selecionado'] = precoItem['preco'];
+                              produtoSelecionado!['tamanho_selecionado'] =
+                                  value;
+                              produtoSelecionado!['preco_selecionado'] =
+                                  precoItem['preco'];
                             });
                           },
                         );
@@ -362,15 +386,18 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
                     const SizedBox(width: 16),
                     IconButton(
                       icon: const Icon(Icons.remove),
-                      onPressed: quantidade > 1 ? () {
-                        setState(() {
-                          quantidade--;
-                        });
-                      } : null,
+                      onPressed: quantidade > 1
+                          ? () {
+                              setState(() {
+                                quantidade--;
+                              });
+                            }
+                          : null,
                     ),
                     Text(
                       quantidade.toString(),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     IconButton(
                       icon: const Icon(Icons.add),
@@ -406,10 +433,12 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
                       children: [
                         const Text(
                           'Total:',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          _currencyFormat.format(_calcularPrecoTotal(produtoSelecionado!, quantidade)),
+                          _currencyFormat.format(_calcularPrecoTotal(
+                              produtoSelecionado!, quantidade)),
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -428,68 +457,78 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              onPressed: (produtoSelecionado == null || 
-                         (produtoSelecionado!['tipo_produto'] == 'pizza' && produtoSelecionado!['tamanho_selecionado'] == null))
-                        ? null 
-                        : () async {
-                double preco = 0.0;
-                String observacoesCompletas = observacoesController.text;
-                
-                if (produtoSelecionado!['tipo_produto'] == 'pizza') {
-                  preco = (produtoSelecionado!['preco_selecionado'] ?? 0.0).toDouble();
-                  observacoesCompletas = '${produtoSelecionado!['tamanho_selecionado']} - $observacoesCompletas'.trim();
-                } else {
-                  preco = (produtoSelecionado!['preco_unitario'] ?? produtoSelecionado!['preco'] ?? 0.0).toDouble();
-                }
-                
-                final itemData = {
-                  'produto_id': produtoSelecionado!['id'],
-                  'quantidade': quantidade,
-                  'preco_unitario': preco,
-                  'total': preco * quantidade,
-                  'observacoes': observacoesCompletas,
-                };
-                
-                // Salvar contexto antes da operação async
-                final navigator = Navigator.of(context);
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                
-                final success = await _mesaService.adicionarConsumo(mesaId, itemData);
-                
-                if (success) {
-                  if (!mounted) return;
-                  navigator.pop();
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(content: Text('Consumo adicionado com sucesso!')),
-                  );
-                  
-                  // Recarregar detalhes da mesa
-                  navigator.pop();
-                  _carregarMesasAbertas();
-                } else {
-                  if (!mounted) return;
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Erro ao adicionar consumo'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              },
+              onPressed: (produtoSelecionado == null ||
+                      (produtoSelecionado!['tipo_produto'] == 'pizza' &&
+                          produtoSelecionado!['tamanho_selecionado'] == null))
+                  ? null
+                  : () async {
+                      double preco = 0.0;
+                      String observacoesCompletas = observacoesController.text;
+
+                      if (produtoSelecionado!['tipo_produto'] == 'pizza') {
+                        preco =
+                            (produtoSelecionado!['preco_selecionado'] ?? 0.0)
+                                .toDouble();
+                        observacoesCompletas =
+                            '${produtoSelecionado!['tamanho_selecionado']} - $observacoesCompletas'
+                                .trim();
+                      } else {
+                        preco = (produtoSelecionado!['preco_unitario'] ??
+                                produtoSelecionado!['preco'] ??
+                                0.0)
+                            .toDouble();
+                      }
+
+                      final itemData = {
+                        'produto_id': produtoSelecionado!['id'],
+                        'quantidade': quantidade,
+                        'preco_unitario': preco,
+                        'total': preco * quantidade,
+                        'observacoes': observacoesCompletas,
+                      };
+
+                      // Salvar contexto antes da operação async
+                      final navigator = Navigator.of(context);
+                      final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                      final success =
+                          await _mesaService.adicionarConsumo(mesaId, itemData);
+
+                      if (success) {
+                        if (!mounted) return;
+                        navigator.pop();
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                              content: Text('Consumo adicionado com sucesso!')),
+                        );
+
+                        // Recarregar detalhes da mesa
+                        navigator.pop();
+                        _carregarMesasAbertas();
+                      } else {
+                        if (!mounted) return;
+                        scaffoldMessenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Erro ao adicionar consumo'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
               child: const Text('Adicionar'),
             ),
           ],
         ),
       ),
     );
-    
+
     observacoesController.dispose();
     searchController.dispose();
   }
 
   Future<void> _fecharContaMesa(int mesaId) async {
     Navigator.of(context).pop();
-    
+
     final formaPagamento = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -521,7 +560,7 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
     if (formaPagamento == null) return;
 
     final success = await _mesaService.fecharContaMesa(mesaId, formaPagamento);
-    
+
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Conta fechada com sucesso!')),
@@ -556,7 +595,8 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.table_restaurant, size: 64, color: Colors.grey),
+                      Icon(Icons.table_restaurant,
+                          size: 64, color: Colors.grey),
                       SizedBox(height: 16),
                       Text(
                         'Nenhuma mesa aberta',
@@ -568,7 +608,8 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
               : Padding(
                   padding: const EdgeInsets.all(16),
                   child: GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 4,
                       childAspectRatio: 1.2,
                       crossAxisSpacing: 16,
@@ -579,7 +620,7 @@ class _MesasAbertasScreenState extends State<MesasAbertasScreen> {
                       final mesa = _mesasAbertas[index];
                       final numeroMesa = mesa['mesa']?['numero'] ?? 0;
                       final total = mesa['total'] ?? 0.0;
-                      
+
                       return Card(
                         elevation: 4,
                         child: InkWell(

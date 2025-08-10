@@ -62,7 +62,7 @@ class RelatorioCaixaService {
         ),
       ),
       child: pw.Text(
-        'Pizzaria Sistema',
+        'Pit-Stop',
         style: pw.TextStyle(
           fontSize: 12,
           fontWeight: pw.FontWeight.bold,

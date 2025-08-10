@@ -128,32 +128,34 @@ class PedidosScreen extends StatelessWidget {
     ];
 
     if (pedidosMock.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 64,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Nenhum pedido encontrado',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey,
+      return Builder(
+        builder: (context) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 64,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Crie um novo pedido para começar',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
+              const SizedBox(height: 16),
+              Text(
+                'Nenhum pedido encontrado',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Crie um novo pedido para começar',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -163,12 +165,12 @@ class PedidosScreen extends StatelessWidget {
       itemCount: pedidosMock.length,
       itemBuilder: (context, index) {
         final pedido = pedidosMock[index];
-        return _buildPedidoCard(pedido);
+        return _buildPedidoCard(context, pedido);
       },
     );
   }
 
-  Widget _buildPedidoCard(Map<String, dynamic> pedido) {
+  Widget _buildPedidoCard(BuildContext context, Map<String, dynamic> pedido) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8.0),
       child: ListTile(
@@ -214,9 +216,9 @@ class PedidosScreen extends StatelessWidget {
                 const Spacer(),
                 Text(
                   pedido['hora'],
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey,
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
               ],
@@ -225,10 +227,10 @@ class PedidosScreen extends StatelessWidget {
         ),
         trailing: Text(
           'R\$ ${pedido['valor'].toStringAsFixed(2)}',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Color(0xFFDC2626),
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         onTap: () => _showPedidoDetails(pedido),

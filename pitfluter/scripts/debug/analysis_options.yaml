@@ -1,0 +1,18 @@
+# analysis_options.yaml para pasta de scripts de debug
+# Ignora todos os avisos de lint para arquivos de debug/teste
+
+analyzer:
+  exclude:
+    - '**'
+
+linter:
+  rules:
+    # Desabilita todas as regras de lint
+    avoid_print: false
+    prefer_const_constructors: false
+    use_key_in_widget_constructors: false
+    avoid_unnecessary_containers: false
+    prefer_final_fields: false
+    unused_import: false
+    unused_local_variable: false
+    dead_code: false

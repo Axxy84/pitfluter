@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/dashboard_content.dart';
 import '../widgets/produtos_content.dart';
+import '../widgets/theme_toggle_button.dart';
 import '../screens/caixa_screen.dart';
 import '../screens/historico_caixas_screen.dart';
 import '../screens/lista_pedidos_screen.dart';
@@ -110,7 +111,7 @@ class _MainLayoutState extends State<MainLayout> {
                       if (isDesktop) ...[
                         const SizedBox(height: 8),
                         const Text(
-                          'Pizzaria Sistema',
+                          'Pit-Stop',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,
@@ -216,6 +217,14 @@ class _MainLayoutState extends State<MainLayout> {
                           iconSize: 32,
                           color: colorScheme.primary,
                         ),
+                      
+                      const SizedBox(height: 8),
+                      
+                      // Botão de alternância de tema
+                      if (isDesktop)
+                        const ThemeToggleButton(isIconOnly: false)
+                      else
+                        const ThemeToggleButton(isIconOnly: true),
                     ],
                   ),
                 ),

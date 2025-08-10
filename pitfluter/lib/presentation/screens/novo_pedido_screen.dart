@@ -45,12 +45,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
   bool _carregandoProdutos = false;
   List<Map<String, dynamic>> _produtosBanco = [];
 
-  final Map<String, double> _multiplicadorTamanho = {
-    'P': 0.8,
-    'M': 1.0,
-    'G': 1.3,
-    'F': 1.6,
-  };
+  // Removido multiplicadores - agora usa preços específicos do banco
 
   final List<Map<String, dynamic>> _pizzas = [
     {'nome': 'Margherita', 'preco': 32.0, 'imagem': '🍕'},
@@ -125,21 +120,45 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
           final categoria = produto['categorias'];
           final categoriaNome = categoria?['nome'] ?? 'Outros';
 
-          // Extrair preço dos preços relacionados
-          double precoBase = 40.0; // Preço padrão das pizzas promocionais
-          final precos = produto['produtos_precos'] as List?;
-          if (precos != null && precos.isNotEmpty) {
-            // Pegar o preço promocional se existir, senão o preço normal
-            precoBase =
-                (precos[0]['preco_promocional'] ?? precos[0]['preco'] ?? 40.0)
-                    .toDouble();
+          // Processar preços por tamanho
+          final precos = produto['produtos_precos'] as List? ?? [];
+          final precosMap = <String, double>{};
+          
+          for (final preco in precos) {
+            final tamanhoInfo = preco['tamanhos'] as Map<String, dynamic>?;
+            final tamanhoNome = tamanhoInfo?['nome'] as String?;
+            
+            // Mapear nome do tamanho para abreviação
+            String tamanhoAbrev = '';
+            if (tamanhoNome != null) {
+              switch (tamanhoNome.toLowerCase()) {
+                case 'pequena':
+                  tamanhoAbrev = 'P';
+                  break;
+                case 'média':
+                  tamanhoAbrev = 'M';
+                  break;
+                case 'grande':
+                  tamanhoAbrev = 'G';
+                  break;
+                case 'família':
+                  tamanhoAbrev = 'F';
+                  break;
+              }
+            }
+            
+            if (tamanhoAbrev.isNotEmpty) {
+              final precoValor = (preco['preco_promocional'] ?? preco['preco'] ?? 0.0) as num;
+              precosMap[tamanhoAbrev] = precoValor.toDouble();
+            }
           }
 
           return {
             'id': produto['id'],
             'nome': produto['nome'] as String,
             'descricao': produto['descricao'] ?? produto['ingredientes'] ?? '',
-            'preco': precoBase,
+            'precosMap': precosMap,
+            'preco': precosMap['M'] ?? 40.0, // Usar preço médio como padrão
             'categoriaId': produto['categoria_id'],
             'categoriaNome': categoriaNome,
             'imagemUrl': produto['imagem'],
@@ -356,8 +375,6 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         produtos.where((p) => p['nome'] == _produtoSelecionado).firstOrNull;
     if (produto == null) return 0.0;
 
-    double precoBase1 = (produto['preco'] as num).toDouble();
-
     if (_isPizza) {
       // Verificar se é pizza delivery (R$ 40,00 apenas para tamanho médio)
       final categoriaNome = produto['categoriaNome'] ?? '';
@@ -367,17 +384,18 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
         // Pizza Delivery SEMPRE R$ 40,00 (só tem tamanho médio disponível)
         return 40.0 * _quantidade;
       } else {
-        // Aplicar multiplicador de tamanho para outras pizzas
-        double preco1 =
-            precoBase1 * _multiplicadorTamanho[_tamanhoSelecionado]!;
+        // Usar preços específicos do banco de dados
+        final precosMap = produto['precosMap'] as Map<String, double>? ?? {};
+        double preco1 = precosMap[_tamanhoSelecionado] ?? 
+                       (produto['preco'] as num).toDouble();
 
         if (_doisSabores && _sabor2 != null && _sabor2!.isNotEmpty) {
           final produto2 =
               produtos.where((p) => p['nome'] == _sabor2).firstOrNull;
           if (produto2 != null) {
-            double precoBase2 = (produto2['preco'] as num).toDouble();
-            double preco2 =
-                precoBase2 * _multiplicadorTamanho[_tamanhoSelecionado]!;
+            final precosMap2 = produto2['precosMap'] as Map<String, double>? ?? {};
+            double preco2 = precosMap2[_tamanhoSelecionado] ?? 
+                           (produto2['preco'] as num).toDouble();
 
             // SEMPRE pegar o MAIOR preço entre os 2 sabores
             double precoFinal = preco1 > preco2 ? preco1 : preco2;
@@ -390,7 +408,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
       }
     }
 
-    return precoBase1 * _quantidade;
+    // Para produtos que não são pizza, usar preço base
+    return (produto['preco'] as num).toDouble() * _quantidade;
   }
 
   void _adicionarAoCarrinho() {

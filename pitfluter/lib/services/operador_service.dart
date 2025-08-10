@@ -246,10 +246,10 @@ class OperadorService {
     try {
       final response = await _supabase
           .from('operadores')
-          .select('id', const FetchOptions(count: CountOption.exact))
+          .select('id')
           .eq('ativo', true);
 
-      return response.count ?? 0;
+      return response.length;
     } catch (e) {
       throw Exception('Erro ao contar operadores: $e');
     }

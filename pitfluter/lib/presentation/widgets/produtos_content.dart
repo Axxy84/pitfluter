@@ -234,12 +234,38 @@ class _ProdutosContentState extends State<ProdutosContent>
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        'Gerencie o catálogo de produtos',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            'Gerencie o catálogo de produtos',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: colorScheme.primary.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              '${filteredProdutos.length} ${filteredProdutos.length == 1 ? 'produto' : 'produtos'}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

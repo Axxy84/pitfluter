@@ -765,6 +765,86 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
     };
   }
 
+  /// Imprime a comanda da cozinha (sem valores)
+  Future<void> _imprimirComandaCozinha() async {
+    if (_carrinho.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Carrinho vazio - adicione itens primeiro'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      if (!mounted) return;
+      // Mostrar loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Preparando comanda da cozinha...'),
+            ],
+          ),
+        ),
+      );
+
+      // Preparar dados específicos para cozinha
+      final dados = _prepararDadosPedido();
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Fechar loading
+
+      // Imprimir comanda da cozinha
+      final sucesso = await ImpressaoService.imprimirComandaCozinha(
+        numeroPedido: dados['numeroPedido'],
+        dataPedido: dados['dataPedido'],
+        itens: _carrinho,
+        tipoPedido: _tipoPedido,
+        mesa: _tipoPedido == 'mesa' ? _mesaSelecionada.toString() : null,
+        cliente: _tipoPedido == 'delivery' ? _nomeClienteController.text.trim() : 
+                _tipoPedido == 'balcao' ? _nomeRetiradaController.text.trim() : null,
+        endereco: _tipoPedido == 'delivery' ? _enderecoController.text.trim() : null,
+        observacoesPedido: dados['observacoesPedido'],
+      );
+
+      if (!mounted) return;
+
+      if (sucesso) {
+        HapticFeedback.lightImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Comanda da cozinha impressa com sucesso! 👨‍🍳'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao imprimir comanda da cozinha'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Fechar loading se ainda estiver aberto
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erro inesperado ao imprimir'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   /// Imprime a comanda do pedido
   Future<void> _imprimirComanda() async {
     if (_carrinho.isEmpty) {
@@ -2662,6 +2742,18 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen>
                 child: OutlinedButton(
                   onPressed: _carrinho.isNotEmpty ? _imprimirComanda : null,
                   child: const Text('Imprimir'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _carrinho.isNotEmpty ? _imprimirComandaCozinha : null,
+                  icon: const Icon(Icons.restaurant_menu, size: 18),
+                  label: const Text('Cozinha'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.orange.shade700,
+                    side: BorderSide(color: Colors.orange.shade300),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),

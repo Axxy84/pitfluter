@@ -1,0 +1,75 @@
+========================================================
+INSTRUÇÕES DE INSTALAÇÃO - PITFLUTER (Windows sem PowerShell)
+========================================================
+
+OPÇÃO 1: INSTALAÇÃO COMPLETA (Se o Flutter não está instalado)
+---------------------------------------------------------------
+
+1. INSTALAR FLUTTER MANUALMENTE:
+   a) Baixe o Flutter SDK:
+      https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.24.5-stable.zip
+   
+   b) Extraia o arquivo ZIP para C:\flutter
+   
+   c) Adicione ao PATH do Windows:
+      - Abra "Painel de Controle"
+      - Sistema e Segurança > Sistema
+      - Configurações avançadas do sistema
+      - Variáveis de Ambiente
+      - Em "Variáveis do sistema", encontre PATH
+      - Clique em Editar
+      - Adicione: C:\flutter\bin
+      - Clique OK em todas as janelas
+
+2. INSTALAR O PITFLUTER:
+   a) Copie a pasta do projeto para C:\pitfluter
+   b) Abra o Prompt de Comando (cmd.exe)
+   c) Digite:
+      cd C:\pitfluter\scripts_windows
+      instalar_cmd.bat
+
+3. EXECUTAR O SISTEMA:
+   - No Prompt de Comando:
+     executar_cmd.bat
+
+
+OPÇÃO 2: USAR VERSÃO PRÉ-COMPILADA (Mais Simples!)
+----------------------------------------------------
+
+1. BAIXAR VERSÃO COMPILADA:
+   - Peça ao desenvolvedor a pasta "Release" já compilada
+   - Ou use criar_instalador_cmd.bat em um PC com Flutter
+
+2. INSTALAR:
+   a) Copie a pasta "Release" para C:\PitFluter
+   b) Crie um atalho do arquivo pitfluter.exe na área de trabalho
+
+3. EXECUTAR:
+   - Dê duplo clique no atalho criado
+
+
+SOLUÇÃO DE PROBLEMAS
+--------------------
+
+ERRO: "Flutter não encontrado"
+- Solução: Instale o Flutter conforme OPÇÃO 1, passo 1
+
+ERRO: "VCRUNTIME140.dll não foi encontrado"
+- Solução: Instale o Visual C++ Redistributable:
+  https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+ERRO: Tela branca ou não abre
+- Verifique se o Windows está atualizado
+- Desative temporariamente o antivírus
+- Execute como Administrador
+
+CONFIGURAÇÃO DO BANCO DE DADOS
+-------------------------------
+O sistema já está configurado para usar o banco de dados online.
+Não é necessária nenhuma configuração adicional.
+
+
+SUPORTE
+-------
+Em caso de problemas, entre em contato com o desenvolvedor
+informando a mensagem de erro exata.

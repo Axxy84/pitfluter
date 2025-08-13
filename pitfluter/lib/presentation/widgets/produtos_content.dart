@@ -896,7 +896,9 @@ class _ProdutoCard extends StatelessWidget {
                           }
                         }
                         
-                        Navigator.of(dialogContext).pop();
+                        if (dialogContext.mounted) {
+                          Navigator.of(dialogContext).pop();
+                        }
                         
                         // Mostrar mensagem de sucesso e recarregar dados
                         if (context.mounted) {
